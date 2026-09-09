@@ -1,0 +1,12 @@
+ethnic-flute-ambient.mp3
+  Original filename: "Ethnic Instrumentals  Most Relaxing Flute Music No Copyright
+  Background Music.mp3"
+  450s, 44.1kHz stereo, ~110 kbps.
+
+The track ends with a fade-out beginning around 433s. Looping it as-is would
+fade to silence and then jump back to a mid-level start, which is audible every
+time. src/core/audio.js instead crossfades a second copy in at 432s over six
+seconds and drops the outro entirely, so the loop point is inaudible.
+
+Those two numbers live in MUSIC in src/core/audio.js. Swap the track and they
+are the only things that need changing.
