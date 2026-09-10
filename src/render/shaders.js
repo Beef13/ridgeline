@@ -92,9 +92,11 @@ export const tubeFrag = /* glsl */`
   }
 
   void main() {
+    vec3 col = vec3(0.0);
     if (uOn < 0.5) {
       vec2 p = vUv * uRes;
-      gl_FragColor = vec4(texture2D(tPal, (floor(p) + 0.5) / uRes).rgb, 1.0);
+      col = texture2D(tPal, (floor(p) + 0.5) / uRes).rgb;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
       return;
     }
     vec2 uv = curve(vUv);
@@ -102,7 +104,7 @@ export const tubeFrag = /* glsl */`
       gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return;
     }
     vec2 suv = beam(uv);
-    vec3 col = tap(suv);
+    col = tap(suv);
 
     if (uGlow > 0.001) {
       vec2 px = 1.0 / uRes;

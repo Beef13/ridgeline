@@ -145,6 +145,8 @@ function resize() {
   stage.style.height = cssH + 'px';
   renderer.domElement.style.width = cssW + 'px';
   renderer.domElement.style.height = cssH + 'px';
+  // the radius is a fraction of the screen, so it has to follow the screen
+  pipeline.applyCorner();
   camera.aspect = pipeline.width / pipeline.height;
   camera.updateProjectionMatrix();
 }

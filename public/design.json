@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "saved": "2026-09-10 07:12",
+  "saved": "2026-09-10 07:46",
   "raster": {
     "w": 256,
     "h": 224,
@@ -71,7 +71,7 @@
   "crt": {
     "on": true,
     "soft": 0.91,
-    "scan": 0.2,
+    "scan": 0.13,
     "mask": 0.22,
     "glow": 0.69,
     "curve": 0.245,
@@ -507,6 +507,7 @@
     "poseFps": 12,
     "camBehind": 2.4,
     "camLerpY": 5,
-    "obstacleWarm": 0.55
+    "obstacleWarm": 0.55,
+    "cornerRadius": 0.075
   }
 }

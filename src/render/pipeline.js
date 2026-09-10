@@ -68,6 +68,27 @@ export class Pipeline {
   }
 
   /** Fit to the container at a whole-number scale, and report it. */
+  /**
+   * Corner fillet, as a fraction of the SHORTER side of the screen.
+   *
+   * Done by clipping the canvas element rather than masking in the tube pass.
+   * The shader was the obvious place and the wrong one: barrel distortion
+   * already blacks out the extreme corners, so a mask there removed pixels
+   * that were black anyway and nothing changed on screen. Clipping the element
+   * lets the page ground show through, which is what makes the curve visible.
+   */
+  setCornerRadius(frac) {
+    this.corner = Math.max(0, Math.min(0.5, frac || 0));
+    this.applyCorner();
+  }
+
+  applyCorner() {
+    const el = this.renderer.domElement;
+    const w = parseFloat(el.style.width) || el.width;
+    const h = parseFloat(el.style.height) || el.height;
+    el.style.borderRadius = (this.corner || 0) * Math.min(w, h) + 'px';
+  }
+
   fit(containerW, containerH) {
     this.scale = Math.max(1, Math.floor(Math.min(containerW / this.width, containerH / this.height)));
     const w = this.width * this.scale, h = this.height * this.scale;
