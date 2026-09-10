@@ -90,6 +90,29 @@ let bellsRung = 0;
 // goes quiet and the player assumes the key is broken
 addEventListener('keydown', (e) => { if (e.code === 'KeyM') sfx.setMuted(music.muted); });
 
+/* Wake the audio inside the gesture's OWN call stack.
+ *
+ * Both engines used to be started from the fixed step, one frame after the
+ * press that armed them. Desktop Chrome forgives that — its user activation is
+ * sticky, so anything on the page may play once you have touched it once. iOS
+ * does not: play() and an AudioContext have to be reached synchronously from
+ * the handler, and a frame later is already too late. So the game was silent
+ * on every phone and fine on every desktop, which is exactly the shape of bug
+ * that survives testing.
+ *
+ * Capture phase, so nothing downstream can stop it first. Both calls are
+ * idempotent, and the loop still calls them as a belt-and-braces fallback.
+ */
+const unlock = () => {
+  sfx.init();                 // first: it owns the context the music hangs on
+  music.attach(sfx.ctx);
+  music.start();
+  removeEventListener('pointerdown', unlock, true);
+  removeEventListener('keydown', unlock, true);
+};
+addEventListener('pointerdown', unlock, true);
+addEventListener('keydown', unlock, true);
+
 let state = STATE.READY;
 let best = 0;
 try { best = parseFloat(localStorage.getItem('ridgeline.best') || '0') || 0; } catch (e) {}

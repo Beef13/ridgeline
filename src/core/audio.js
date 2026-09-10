@@ -47,6 +47,7 @@ export class Music {
     this.fadeT = 0;
     this.started = false;
     this.duck = 1;
+    this.gains = null;          // set by attach(); until then the element fades itself
 
     addEventListener('keydown', (e) => { if (e.code === 'KeyM') this.toggleMute(); });
     // Nothing should keep playing into a tab the player has left.
@@ -64,6 +65,40 @@ export class Music {
   setVolume(v) { this.volume = v; this.save(); }
   toggleMute() { this.muted = !this.muted; this.save(); }
   setDuck(on) { this.duck = on ? this.cfg.duckOnDeath : 1; }
+
+  /**
+   * Route both elements through the Web Audio graph.
+   *
+   * iOS makes `HTMLMediaElement.volume` READ-ONLY. The assignment does not
+   * throw, it is simply ignored — so every fade in this class silently does
+   * nothing on a phone: the track starts at full blast instead of 0.55, the
+   * volume slider is decorative, and at the loop point two copies play over
+   * each other at full level for six seconds instead of crossfading. A
+   * GainNode is not subject to that rule, so once there is a context to hang
+   * one on, the node becomes the fader and the element is just a source.
+   *
+   * Only ever once per element — a second createMediaElementSource on the
+   * same element throws.
+   */
+  attach(ctx) {
+    if (this.gains || !ctx) return;
+    try {
+      this.gains = this.els.map((a) => {
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        ctx.createMediaElementSource(a).connect(g).connect(ctx.destination);
+        a.volume = 1;
+        return g;
+      });
+    } catch (e) { console.warn('[audio] no graph, using element volume:', e.message || e); }
+  }
+
+  /** Set one element's level, wherever the fader actually lives. */
+  gain(i, v) {
+    const c = Math.min(1, Math.max(0, v));
+    if (this.gains) this.gains[i].gain.value = c;
+    else this.els[i].volume = c;
+  }
 
   /** Must be called from a user gesture — browsers refuse audio before one. */
   start() {
@@ -83,12 +118,12 @@ export class Music {
     const a = this.els[this.cur], b = this.els[1 - this.cur];
 
     if (!this.fading) {
-      a.volume = Math.min(1, Math.max(0, this.target()));
+      this.gain(this.cur, this.target());
       const dur = a.duration;
       if (dur && a.currentTime >= dur - loopTail) {
         // Bring the next copy in before the outro starts, and drop the outro.
         b.currentTime = 0;
-        b.volume = 0;
+        this.gain(1 - this.cur, 0);
         b.play().catch(() => {});
         this.fading = true;
         this.fadeT = 0;
@@ -99,8 +134,8 @@ export class Music {
     this.fadeT = Math.min(1, this.fadeT + dt / crossfade);
     const t = this.target();
     // equal-power, so the sum stays level through the blend instead of dipping
-    a.volume = Math.min(1, Math.max(0, Math.cos(this.fadeT * Math.PI / 2) * t));
-    b.volume = Math.min(1, Math.max(0, Math.sin(this.fadeT * Math.PI / 2) * t));
+    this.gain(this.cur, Math.cos(this.fadeT * Math.PI / 2) * t);
+    this.gain(1 - this.cur, Math.sin(this.fadeT * Math.PI / 2) * t);
 
     if (this.fadeT >= 1) {
       a.pause();
