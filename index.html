@@ -17,6 +17,7 @@
         --ground: #060e08;      /* the cabinet the screen sits in */
         --score:  #ffd83d;
         --faint:  #2f4436;
+        --dim:    #55705f;    /* muted: still legible, clearly switched off */
       }
       * { box-sizing: border-box; }
       html, body {
@@ -123,6 +124,28 @@
       }
       #hiscore .m { font-size: 0.78em; }
 
+      /* Music mute. Mobile only — a phone has no keyboard to press M on. */
+      #m-music {
+        display: none;
+        padding: 10px;            /* a 26px icon is not a 26px target */
+        margin: 8px 0 0;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        color: var(--score);
+        line-height: 0;
+        flex: 0 0 auto;
+        touch-action: manipulation;
+      }
+      #m-music svg { width: clamp(24px, 6.4vw, 34px); height: auto; display: block; }
+      /* `display: block` above is an ID-scoped rule, so it OUTRANKS the
+         browser's own `[hidden] { display: none }` — without this the muted
+         glyph sits under the unmuted one and both show at once. */
+      #m-music svg[hidden] { display: none; }
+      /* Muted reads two ways at once — the glyph gains a slash AND the colour
+         drops out — so it survives a glance. */
+      #m-music.off { color: var(--dim); }
+
       footer {
         margin: 6px 0 0;
         flex: 0 0 auto;
@@ -178,15 +201,21 @@
            bottom edge with a void between it and the game. An auto margin on
            BOTH sides splits the slack evenly instead, floating the score in
            the middle of that band. */
+        /* One number, two elements. The lift is visual only (`relative`), so
+           anything that has to travel with the score must carry the SAME
+           offset — otherwise the button stays at its layout position down by
+           the byline while the score floats 10vh above it. */
+        .cabinet { --lift: -10vh; }
         #hiscore {
           /* Anchored to the bottom, then lifted — not centred. The slack all
              collects above it, so the score keeps a fixed distance from the
              byline whatever the screen height, instead of drifting with the
-             size of the gap. `relative` keeps the lift purely visual. */
+             size of the gap. */
           margin: auto 0 0;
           position: relative;
-          top: -10vh;
+          top: var(--lift);
         }
+        #m-music { display: block; position: relative; top: var(--lift); }
       }
     </style>
   </head>
@@ -200,6 +229,23 @@
       <img id="logo" src="./logo.png" alt="Ridge Run" />
       <div id="stage"></div>
       <p id="hiscore">HIGH SCORE: 0000<span class="m">m</span></p>
+      <!-- Inline rather than image files: two colours and a swapped glyph is
+           less code than two PNGs, it recolours with `currentColor`, and it
+           cannot be the one asset that fails to load. -->
+      <button id="m-music" type="button" aria-label="Mute music" aria-pressed="false">
+        <svg data-on viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+        </svg>
+        <svg data-off hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+          <path d="M3 2l18 20" />
+        </svg>
+      </button>
+
       <footer>Beef13 &middot; 2026</footer>
     </div>
     <script>

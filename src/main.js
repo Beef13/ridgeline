@@ -90,6 +90,22 @@ let bellsRung = 0;
 // goes quiet and the player assumes the key is broken
 addEventListener('keydown', (e) => { if (e.code === 'KeyM') sfx.setMuted(music.muted); });
 
+/* The mute button, and the M key, are two ways into one piece of state — so
+   the icon is repainted from `music.muted` rather than from its own toggle
+   count. Press M with the button on screen and the glyph still follows. */
+const musicBtn = document.getElementById('m-music');
+if (musicBtn) {
+  const paintMusic = () => {
+    musicBtn.classList.toggle('off', music.muted);
+    musicBtn.setAttribute('aria-pressed', String(music.muted));
+    musicBtn.querySelector('[data-on]').hidden = music.muted;
+    musicBtn.querySelector('[data-off]').hidden = !music.muted;
+  };
+  musicBtn.addEventListener('click', (e) => { e.preventDefault(); music.toggleMute(); paintMusic(); });
+  addEventListener('keydown', (e) => { if (e.code === 'KeyM') paintMusic(); });
+  paintMusic();   // the choice is remembered across visits
+}
+
 /* Wake the audio inside the gesture's OWN call stack.
  *
  * Both engines used to be started from the fixed step, one frame after the

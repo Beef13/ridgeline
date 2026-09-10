@@ -49,6 +49,9 @@ export class Input {
     this.jumpDelay = 0.05;                 // s the jump waits to see a swipe instead
 
     const down = (e) => {
+      /* The listener is on the window, so it sees presses meant for the mute
+         button too — without this, muting the music also starts a run. */
+      if (e.target && e.target.closest && e.target.closest('button,input,select,textarea,a,label')) return;
       this._touchId = e.pointerId;         // the newest finger is the one that counts
       this._anyLatch = true;               // any contact starts or restarts a run
       this._pendAt = now();
