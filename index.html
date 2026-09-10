@@ -179,14 +179,13 @@
            BOTH sides splits the slack evenly instead, floating the score in
            the middle of that band. */
         #hiscore {
-          margin: auto 0;
-          /* An even split centres the score between the glass and the BYLINE,
-             not the glass and the screen edge — the byline and the cabinet's
-             bottom padding hang below it. Shifting down by half that block
-             puts it on the true midpoint, and `relative` keeps the shift
-             purely visual so the split above stays honest. */
+          /* Anchored to the bottom, then lifted — not centred. The slack all
+             collects above it, so the score keeps a fixed distance from the
+             byline whatever the screen height, instead of drifting with the
+             size of the gap. `relative` keeps the lift purely visual. */
+          margin: auto 0 0;
           position: relative;
-          top: calc(clamp(20px, 3.4vh, 40px) / 2 + 10px);
+          top: -10vh;
         }
       }
     </style>
