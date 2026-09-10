@@ -193,7 +193,7 @@ function liftVeil() {
 // screen anyone should be asked to sit through.
 setTimeout(() => { artReady = true; liftVeil(); }, 4000);
 
-window.__dbg = { player, streamer, obstacles, camera, roots, state: () => state, pipeline, scene, vistas, music, sfx };
+window.__dbg = { player, streamer, obstacles, camera, roots, state: () => state, pipeline, scene, vistas, music, sfx, fig };
 
 startLoop({
   step: (dt) => {

@@ -46,6 +46,30 @@ export function makeFigure() {
   return { group: g, body, head, armL, armR, legL, legR, crouch: new THREE.Group() };
 }
 
+/**
+ * Where each part joins the torso, in the BODY's own space.
+ *
+ * The limbs are siblings of the body, not children — so nothing made them
+ * follow it. Every pose that moved the torso (ducking most of all, which drops
+ * it half a unit and tips it over) left the arms and legs hanging in the air
+ * where the standing pose had put them. Deriving their positions from the
+ * body's matrix each frame means they cannot come apart, whatever the pose
+ * does, including poses nobody has written yet.
+ */
+const JOINT = {
+  head: new THREE.Vector3(0.05, 0.50, 0),
+  armL: new THREE.Vector3(-0.02, 0.28, 0.26),
+  armR: new THREE.Vector3(-0.02, 0.28, -0.26),
+  legL: new THREE.Vector3(0.02, -0.30, 0.20),
+  legR: new THREE.Vector3(0.02, -0.30, -0.20)
+};
+const _j = new THREE.Vector3();
+
+function reattach(fig) {
+  fig.body.updateMatrix();
+  for (const k in JOINT) fig[k].position.copy(_j.copy(JOINT[k]).applyMatrix4(fig.body.matrix));
+}
+
 export function poseFigure(fig, p, t, dead) {
   const ph = p.runPhase * 1.05;
   const s = Math.sin(ph), c = Math.cos(ph);
@@ -57,24 +81,25 @@ export function poseFigure(fig, p, t, dead) {
     fig.body.position.y = 0.86;
   } else if (p.ducking) {
     // Fold down rather than shrink — a scaled character reads as a bug.
-    fig.armL.rotation.z = -1.5; fig.armR.rotation.z = -1.3 + s * 0.3;
-    fig.legL.rotation.z = 1.5 + s * 0.4; fig.legR.rotation.z = 1.4 - s * 0.4;
-    fig.body.rotation.z = 1.15;
-    fig.body.position.y = 0.42;
-    fig.head.rotation.z = 0.9;
-    fig.head.position.set(0.48, 0.62, 0);
+    fig.armL.rotation.z = -2.0 + s * 0.2; fig.armR.rotation.z = -1.8 + s * 0.3;
+    fig.legL.rotation.z = 0.95 + s * 0.35; fig.legR.rotation.z = 0.8 - s * 0.35;
+    fig.body.rotation.z = -1.15;          // negative folds FORWARD, over the knees
+    fig.body.position.y = 0.52;
+    fig.head.rotation.z = -0.55;
   } else if (!p.grounded) {
     const tuck = p.vy > 0 ? 1 : -1;
     fig.armL.rotation.z = -2.1; fig.armR.rotation.z = -1.9;
     fig.legL.rotation.z = 0.55 * tuck + 0.3; fig.legR.rotation.z = -0.35 * tuck + 0.3;
     fig.body.rotation.z = -0.10; fig.body.position.y = 0.96;
-    fig.head.rotation.z = -0.08; fig.head.position.set(0.05, 1.42, 0);
+    fig.head.rotation.z = -0.08;
   } else {
     fig.armL.rotation.z = s * 1.25;  fig.armR.rotation.z = -s * 1.25;
     fig.legL.rotation.z = -s * 0.95; fig.legR.rotation.z = s * 0.95;
     fig.body.rotation.z = -0.26;
     fig.body.position.y = 0.92 + Math.abs(c) * 0.06;
     fig.head.rotation.z = -0.12 + s * 0.05;
-    fig.head.position.set(0.05, 1.42, 0);
   }
+
+  // last, and unconditionally: every pose above only says what the torso does
+  reattach(fig);
 }
