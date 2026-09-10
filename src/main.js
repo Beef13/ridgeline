@@ -191,33 +191,6 @@ function resize() {
 
   stage.style.flex = '0 0 auto';
   stage.style.height = cssH + 'px';
-
-  /* How far the score sits below the glass, in pixels, derived from the SCREEN
-     rather than from the viewport.
-
-     Anchoring that gap to vh looked right in Safari and wrong as a home-screen
-     app: standalone has no address bar and no toolbar, so the viewport is
-     ~100px taller and every vh is bigger with it, while the screen itself does
-     not change — it only scales in whole multiples of 256x224. Anything
-     measured against the viewport therefore moves the instant the browser
-     chrome goes away. Measured against the screen, the composition is
-     identical in both, and still scales when the screen does step up a size.
-
-     The cap has to be measured with the gap at ZERO. Reading the free space
-     while the margin is applied is circular — the number you get already
-     includes the margin you are about to set, so it shrinks every time the
-     function runs. */
-  const el = document.documentElement;
-  el.style.setProperty('--gap', '0px');
-  const btn = document.getElementById('m-music');
-  const scoreEl = document.getElementById('hiscore');
-  const foot = document.querySelector('footer');
-  // on desktop the button is display:none, so its box is meaningless
-  const last = btn && btn.offsetParent ? btn : scoreEl;
-  let free = Infinity;
-  if (last && foot) free = foot.getBoundingClientRect().top - last.getBoundingClientRect().bottom;
-  const gap = Math.max(8, Math.min(Math.round(cssH * 0.5), Math.round(free - 40)));
-  el.style.setProperty('--gap', gap + 'px');
   renderer.domElement.style.width = cssW + 'px';
   renderer.domElement.style.height = cssH + 'px';
   camera.aspect = pipeline.width / pipeline.height;

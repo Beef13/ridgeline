@@ -74,14 +74,7 @@
            the bottom edge. The leftover collects BETWEEN them (see the auto
            margin on #hiscore) rather than being split above and below, which
            is what lifts the top of the page without moving the text. */
-        /* env() insets are zero in Safari, where the toolbars already stand the
-           page off both edges — and non-zero as a home-screen app, which draws
-           right under the status bar and the home indicator. Without them the
-           byline sits on top of the indicator in standalone. */
-        padding:
-          calc(clamp(6px, 1vh, 14px) + env(safe-area-inset-top, 0px))
-          16px
-          calc(clamp(20px, 3.4vh, 40px) + env(safe-area-inset-bottom, 0px));
+        padding: clamp(6px, 1vh, 14px) 16px clamp(20px, 3.4vh, 40px);
         justify-content: flex-start;
       }
 
@@ -208,18 +201,21 @@
            bottom edge with a void between it and the game. An auto margin on
            BOTH sides splits the slack evenly instead, floating the score in
            the middle of that band. */
-        /* Anchored to the GLASS, not to the bottom edge.
-           
-           Hanging these off the bottom meant they followed the bottom edge
-           wherever it went — and as a home-screen app it goes about 100px
-           further down, because there is no address bar or toolbar to stop it.
-           Measuring down from the screen instead keeps the score and its
-           button in the same place relative to the game in both. The leftover
-           now collects BELOW them (see the byline's auto margin) instead of
-           above. `--gap` is set in resize(), from the screen's own height. */
-        #hiscore { margin: var(--gap, 24vh) 0 0; position: static; top: auto; }
-        #m-music { display: block; position: static; top: auto; margin: 8px 0 0; }
-        footer { margin-top: auto; }
+        /* One number, two elements. The lift is visual only (`relative`), so
+           anything that has to travel with the score must carry the SAME
+           offset — otherwise the button stays at its layout position down by
+           the byline while the score floats 10vh above it. */
+        .cabinet { --lift: -13vh; }
+        #hiscore {
+          /* Anchored to the bottom, then lifted — not centred. The slack all
+             collects above it, so the score keeps a fixed distance from the
+             byline whatever the screen height, instead of drifting with the
+             size of the gap. */
+          margin: auto 0 0;
+          position: relative;
+          top: var(--lift);
+        }
+        #m-music { display: block; position: relative; top: var(--lift); }
       }
     </style>
   </head>
