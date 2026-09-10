@@ -188,6 +188,27 @@
       <p id="hiscore">HIGH SCORE: 0000<span class="m">m</span></p>
       <footer>Beef13 &middot; 2026</footer>
     </div>
+    <script>
+      /* The last word on the iOS magnifier.
+       *
+       * CSS gets you most of the way — `user-select: none` kills the selection
+       * and `-webkit-touch-callout: none` kills the copy/paste menu — but from
+       * iOS 17 the loupe is raised by Safari's own long-press gesture
+       * recogniser, which runs before any of that is consulted. The only thing
+       * that stands it down is preventing the default on `touchstart`, and it
+       * has to be a NON-PASSIVE listener or the call is ignored outright.
+       *
+       * Pointer events are unaffected: preventing the touch default suppresses
+       * the native UI and the synthesised mouse events, not pointerdown /
+       * pointermove / pointerup, which is the whole input path. The guard
+       * exists for the dev panels — a slider you cannot drag is a worse bug
+       * than a magnifier.
+       */
+      document.addEventListener('touchstart', (e) => {
+        if (e.target.closest && e.target.closest('input,select,textarea,button,label,a,[contenteditable]')) return;
+        e.preventDefault();
+      }, { passive: false });
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
