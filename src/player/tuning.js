@@ -42,5 +42,7 @@ export const feel = {
 
   // --- touch ---
   // How much of the bottom of the screen ducks. The rest jumps, on contact.
-  duckZone:      0.34
+  swipeDist:     18,
+  duckMin:       0.35,
+  jumpDelay:     0.05
 };

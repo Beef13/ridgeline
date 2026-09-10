@@ -197,7 +197,10 @@ window.__dbg = { player, streamer, obstacles, camera, roots, state: () => state,
 
 startLoop({
   step: (dt) => {
-    input.duckZone = feel.duckZone;     // live, so the slider means something
+    // live, so the sliders mean something
+    input.swipeDist = feel.swipeDist;
+    input.duckMin = feel.duckMin;
+    input.jumpDelay = feel.jumpDelay;
     const inp = input.sample();
 
     // the first gesture is the only moment an AudioContext can be created

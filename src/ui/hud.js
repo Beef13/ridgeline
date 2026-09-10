@@ -84,7 +84,7 @@ export class Hud {
     /* On a touch device the arrow keys do not exist, and showing them is worse
        than showing nothing — it names two controls the player cannot reach. */
     if (TOUCH) {
-      this.text('TAP TOP  \u00B7  HOLD BOTTOM', this.w / 2, top, DIM, 'center', size);
+      this.text('TAP JUMP  \u00B7  SWIPE DOWN DUCK', this.w / 2, top, DIM, 'center', size);
       return;
     }
     const c = this.ctx;
