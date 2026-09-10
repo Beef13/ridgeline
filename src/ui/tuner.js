@@ -1,4 +1,5 @@
-import { mountPanel, copyBlock } from './panel.js';
+import { mountPanel } from './panel.js';
+import { copyDesign } from './capture.js';
 
 const FEEL_SPEC = (feel, view) => [
   ['The run', feel, [['startSpeed', 3, 20, 0.1], ['maxSpeed', 6, 34, 0.5], ['speedRamp', 0, 1, 0.01]]],
@@ -29,6 +30,6 @@ export function mountTuner(feel, view, music) {
     title: 'FEEL', side: 'right', hotkey: '`',
     groups,
     onChange: (k) => { if (k === 'volume' && music) music.setVolume(audio.volume); },
-    extraButtons: [['COPY SETTINGS', (btn) => copyBlock('feel', feel, btn)]]
+    extraButtons: [['COPY DESIGN', copyDesign]]
   });
 }

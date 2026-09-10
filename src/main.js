@@ -42,7 +42,14 @@ pipeline.uploadPalette(PAL_RGB);
 for (const k of FEEL_KEYS_THAT_TRANSFER) {
   if (k in design.feel) feel[k] = design.feel[k];
 }
+/* The runner's own numbers — spawn distances, hitboxes, camera. They ride in
+   the same file under a key the bench ignores, so one paste carries the whole
+   game and not just the half a bench scene can show. */
+for (const [k, v] of Object.entries(design.game || {})) {
+  if (k in feel) feel[k] = v;
+}
 view.fov = design.optics.fov;
+window.__view = view;   // capture.js reads the live fov back out
 feel.poseFps = design.time.fps;
 pipeline.setInternalSize(design.raster.w, design.raster.h);
 cue.dark = design.atmos.dark;

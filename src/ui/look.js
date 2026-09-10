@@ -30,9 +30,9 @@ export const look = {
   fogVistas: d.atmos.fog.vistas ? 1 : 0,
   cueDark: d.atmos.dark,
   cueCool: d.atmos.cool,
-  /* Not a bench number — the bench has no obstacles to look at. It lives here
-     so it survives a design paste, and COPY LOOK carries it out with the rest. */
-  obstacleWarm: 0.55
+  /* Not a bench number — a bench scene has no obstacles in it. It rides in the
+     design's `game` block, which the bench ignores and COPY DESIGN writes. */
+  obstacleWarm: d.game?.obstacleWarm ?? 0.55
 };
 
 const PAL = { quantise: 'uQuant', ditherMode: 'uMode', blend: 'uDither', pairLimit: 'uPair' };

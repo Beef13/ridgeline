@@ -1,6 +1,7 @@
-import { mountPanel, copyBlock } from './panel.js';
-import { look, pushLook, LOOK_GROUPS } from './look.js';
+import { mountPanel } from './panel.js';
+import { pushLook, LOOK_GROUPS } from './look.js';
 import { mountTuner } from './tuner.js';
+import { copyDesign } from './capture.js';
 
 /**
  * The live tuning panels — development only.
@@ -16,7 +17,9 @@ export function mountPanels({ pipeline, vistas, world, feel, view, music }) {
     title: 'LOOK', side: 'left', hotkey: '1',
     onChange: () => pushLook(pipeline, vistas, world),
     groups: LOOK_GROUPS(),
-    extraButtons: [['COPY LOOK', (btn) => copyBlock('look', look, btn)]]
+    // the same button on both panels — one design, and you are never more than
+    // one click from it whichever half you happen to be tuning
+    extraButtons: [['COPY DESIGN', copyDesign]]
   });
   const feel$ = mountTuner(feel, view, music);
   return { look: look$, feel: feel$ };

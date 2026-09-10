@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "saved": "2026-09-10 05:06",
+  "saved": "2026-09-10 06:13",
   "raster": {
     "w": 256,
     "h": 224,
@@ -10,7 +10,7 @@
     "quant": false,
     "mode": "2",
     "amount": 1,
-    "pair": 0.49
+    "pair": 0.42
   },
   "grade": {
     "target": "palette",
@@ -24,7 +24,7 @@
   "optics": {
     "fov": 14,
     "vistaMaster": 0.32,
-    "vistaHorizon": -1
+    "vistaHorizon": -3
   },
   "atmos": {
     "cue": true,
@@ -71,7 +71,7 @@
   "crt": {
     "on": true,
     "soft": 0.91,
-    "scan": 0.43,
+    "scan": 0.4,
     "mask": 0.22,
     "glow": 0.69,
     "curve": 0.245,
@@ -120,7 +120,7 @@
     "jumpVelocity": 10.6,
     "doubleJumpVel": 9.2,
     "jumpCutoff": 0.45,
-    "airJumps": 0,
+    "airJumps": 1,
     "duckDrop": -26,
     "coyoteTime": 0.09,
     "jumpBuffer": 0.12,
@@ -491,5 +491,22 @@
       "depth": 62
     }
   ],
-  "player": null
+  "player": null,
+  "game": {
+    "startSpeed": 7,
+    "maxSpeed": 17,
+    "speedRamp": 0.16,
+    "duckSpeedMul": 0.92,
+    "standW": 0.62,
+    "standH": 1.62,
+    "duckW": 0.86,
+    "duckH": 0.82,
+    "reactionTime": 0.62,
+    "spawnAhead": 34,
+    "difficultyAt": 900,
+    "poseFps": 12,
+    "camBehind": 2.4,
+    "camLerpY": 5,
+    "obstacleWarm": 0.55
+  }
 }
