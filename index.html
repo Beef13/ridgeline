@@ -12,6 +12,21 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="256x256" href="./icon.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <!-- Without this iOS opens the home-screen shortcut chrome-less but still
+         reports `display-mode: browser`, so a standalone media query never
+         matches and the app-specific layout silently never applies. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <script>
+      /* Belt and braces, and it runs before first paint so nothing reflows.
+         `navigator.standalone` is the iOS-only signal and is true from the
+         home screen whatever the media query says — which matters because the
+         meta above only takes effect for shortcuts added AFTER it ships. */
+      try {
+        if (navigator.standalone || matchMedia('(display-mode: standalone)').matches)
+          document.documentElement.classList.add('standalone');
+      } catch (e) {}
+    </script>
     <style>
       :root {
         --ground: #060e08;      /* the cabinet the screen sits in */
@@ -224,13 +239,14 @@
            its own arrangement instead of a fudged offset: the score and its
            button sit right under the glass, the same 8px apart as they are
            from each other, and ALL the leftover collects below them. */
-        @media (display-mode: standalone) {
-          #hiscore { margin: 8px 0 0; position: static; top: auto; }
-          #m-music { position: static; top: auto; }
-          footer { margin-top: auto; }
-          /* Nothing stands the page off the bottom edge here, so without this
-             the byline lands on the home indicator. Zero in Safari. */
-          .cabinet { padding-bottom: calc(clamp(20px, 3.4vh, 40px) + env(safe-area-inset-bottom, 0px)); }
+        .standalone #hiscore { margin: 8px 0 0; position: static; top: auto; }
+        .standalone #m-music { position: static; top: auto; }
+        .standalone footer { margin-top: auto; }
+        /* Nothing stands the page off the bottom edge as an app, so without
+           this the byline lands on the home indicator. Zero in Safari. */
+        .standalone .cabinet {
+          padding-top: calc(clamp(6px, 1vh, 14px) + env(safe-area-inset-top, 0px));
+          padding-bottom: calc(clamp(20px, 3.4vh, 40px) + env(safe-area-inset-bottom, 0px));
         }
       }
     </style>
