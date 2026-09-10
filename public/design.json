@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "saved": "2026-09-10 08:43",
+  "saved": "2026-09-10 15:02",
   "raster": {
     "w": 256,
     "h": 224,
@@ -509,6 +509,9 @@
     "camLerpY": 5,
     "obstacleWarm": 1,
     "cornerRadius": 0.075,
-    "screenGlow": 0.29
+    "screenGlow": 0.29,
+    "swipeDist": 18,
+    "duckMin": 0.35,
+    "jumpDelay": 0.05
   }
 }

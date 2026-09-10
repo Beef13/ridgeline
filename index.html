@@ -173,6 +173,21 @@
       /* On a phone the logo eats the screen the game needs. */
       @media (max-aspect-ratio: 1/1) {
         #logo { width: min(83.6vw, 613px); max-height: 13.1vh; margin-bottom: -1.33vh; }
+        /* A phone leaves a deep band under the glass, and the desktop rule
+           spends all of it above the score — which strands the score on the
+           bottom edge with a void between it and the game. An auto margin on
+           BOTH sides splits the slack evenly instead, floating the score in
+           the middle of that band. */
+        #hiscore {
+          margin: auto 0;
+          /* An even split centres the score between the glass and the BYLINE,
+             not the glass and the screen edge — the byline and the cabinet's
+             bottom padding hang below it. Shifting down by half that block
+             puts it on the true midpoint, and `relative` keeps the shift
+             purely visual so the split above stays honest. */
+          position: relative;
+          top: calc(clamp(20px, 3.4vh, 40px) / 2 + 10px);
+        }
       }
     </style>
   </head>
