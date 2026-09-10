@@ -19,6 +19,7 @@ const FEEL_SPEC = (feel, view) => [
     ['reactionTime', 0.2, 1.6, 0.02], ['spawnAhead', 16, 60, 1], ['difficultyAt', 200, 3000, 50]
   ]],
   ['Camera', feel, [['camBehind', -2, 4, 0.1], ['camLerpY', 1, 20, 0.5], ['poseFps', 4, 60, 1]]],
+  ['Touch', feel, [['touchHold', 0.05, 0.4, 0.01]]],
   ['View', view, [['fov', 7, 46, 1]]]
 ];
 

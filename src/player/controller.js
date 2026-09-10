@@ -83,6 +83,8 @@ export class Runner {
     // every step compounds — at a 1/120 step the rise is crushed to nothing
     // within a few frames and variable jump height stops existing.
     if (input.jumpHeld || this.grounded) this.cutArmed = this.jumping;
+    // a tapped jump has no hold to measure, so there is nothing to cut
+    if (input.fullJump) this.cutArmed = false;
     if (this.cutArmed && !input.jumpHeld && this.vy > 0) {
       this.vy *= f.jumpCutoff;
       this.cutArmed = false;

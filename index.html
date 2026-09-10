@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1" />
     <title>Ridge Run</title>
     <meta name="description" content="An endless runner rendered through a 1994 output stage." />
     <!-- The mark is trimmed of its transparent margin and resampled per size:
@@ -19,7 +19,22 @@
         --faint:  #2f4436;
       }
       * { box-sizing: border-box; }
-      html, body { margin: 0; height: 100%; background: var(--ground); }
+      html, body {
+        margin: 0;
+        background: var(--ground);
+        /* dvh, not %: a phone's address bar grows and shrinks as you play, and
+           a percentage height re-lays-out the page mid-run — which resizes the
+           canvas and costs a frame every time the bar moves. */
+        height: 100dvh;
+        /* No panning, no pinch, no rubber-band. Without this the browser
+           spends the first moments of every touch deciding whether you meant
+           to scroll, and swallows or delays the press. */
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
       body {
         color: var(--score);
         font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -31,7 +46,7 @@
          gets `min-height: 0` because a flex child will not shrink below its
          content otherwise, and the canvas would push the footer off-screen. */
       .cabinet {
-        height: 100%;
+        height: 100dvh;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -72,7 +87,11 @@
         align-items: flex-start;
         justify-content: center;
       }
-      canvas { display: block; image-rendering: pixelated; }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        touch-action: none;
+      }
 
       #hiscore {
         margin: auto 0 0;          /* takes the slack, pinning itself low */

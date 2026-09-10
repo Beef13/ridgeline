@@ -38,5 +38,10 @@ export const feel = {
   // Must stay under half the view width (VIEW_H * aspect / 2 \u2248 4.1) or the
   // runner walks off the left edge of the screen entirely.
   camBehind:     2.4,     // how far left of centre the runner sits
-  camLerpY:      5
+  camLerpY:      5,
+
+  // --- touch ---
+  // Below this, a press is a tap and jumps; above it, a duck. Both actions
+  // pay for it: the jump waits for the lift, the duck waits for the clock.
+  touchHold:     0.13
 };

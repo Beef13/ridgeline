@@ -28,7 +28,7 @@ const BENCH_FEEL = ['runSpeed', 'groundAccel', 'groundFriction', 'airAccel', 'tu
 // the runner's own, meaningless in a bench scene with no obstacles in it
 const GAME_FEEL = ['startSpeed', 'maxSpeed', 'speedRamp', 'duckSpeedMul',
   'standW', 'standH', 'duckW', 'duckH',
-  'reactionTime', 'spawnAhead', 'difficultyAt', 'poseFps', 'camBehind', 'camLerpY'];
+  'reactionTime', 'spawnAhead', 'difficultyAt', 'poseFps', 'camBehind', 'camLerpY', 'touchHold'];
 
 const pick = (src, keys) => {
   const o = {};

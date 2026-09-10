@@ -9,6 +9,9 @@ import * as THREE from 'three';
    are the values the tube pass then lifts by its gain — authored a shade below
    where they should land rather than at full brightness, or the bright one
    clips flat and loses its edge against the shadow. */
+const TOUCH = typeof matchMedia === 'function' &&
+  matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 const BRIGHT = '#ffd23a';
 const DIM    = '#9a7a24';
 
@@ -78,6 +81,12 @@ export class Hud {
 
   /** The control legend: an arrow and its word, twice, centred as one block. */
   legend(top, size) {
+    /* On a touch device the arrow keys do not exist, and showing them is worse
+       than showing nothing — it names two controls the player cannot reach. */
+    if (TOUCH) {
+      this.text('TAP JUMP  \u00B7  HOLD DUCK', this.w / 2, top, DIM, 'center', size);
+      return;
+    }
     const c = this.ctx;
     c.font = `bold ${size}px "Arial Black", "Helvetica Neue", Arial, sans-serif`;
     const aw = size * 1.05, gap = 3, pad = 14;
@@ -109,12 +118,12 @@ export class Hud {
          than a float. Rounding costs the motion its smoothness and buys back
          the crispness, which at this resolution is the better trade. */
       const bob = Math.round(Math.sin(t * 2.1) * 2);
-      this.text('PRESS UP TO RUN', this.w / 2, this.h / 2 - 30 + bob, BRIGHT, 'center', 14);
+      this.text(TOUCH ? 'TAP TO RUN' : 'PRESS UP TO RUN', this.w / 2, this.h / 2 - 30 + bob, BRIGHT, 'center', 14);
       this.legend(this.h / 2 - 11 + bob, 9);
     } else if (state === 'dead') {
       this.text('OUCH', this.w / 2, this.h / 2 - 38, BRIGHT, 'center', 28);
       if (Math.floor(t * 2) % 2 === 0) {
-        this.text('PRESS UP TO RUN AGAIN', this.w / 2, this.h / 2 - 2, BRIGHT, 'center', 12);
+        this.text(TOUCH ? 'TAP TO RUN AGAIN' : 'PRESS UP TO RUN AGAIN', this.w / 2, this.h / 2 - 2, BRIGHT, 'center', 12);
       }
     }
     this.tex.needsUpdate = true;
