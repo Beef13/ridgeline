@@ -55,6 +55,44 @@ export class Hud {
     c.fillText(s, x, y);
   }
 
+  /**
+   * Arrows drawn as triangles, not typed as glyphs. A canvas asks the system
+   * for whatever font has the character, so an arrow can silently arrive from
+   * a different face at a different weight — or as an empty box. Three points
+   * and a fill always look like the same arrow.
+   */
+  tri(cx, top, size, up, colour) {
+    const c = this.ctx;
+    const w = size * 1.05, h = size * 0.9;
+    const path = (dx, dy, fill) => {
+      c.beginPath();
+      if (up) { c.moveTo(cx + dx, top + dy); c.lineTo(cx - w / 2 + dx, top + h + dy); c.lineTo(cx + w / 2 + dx, top + h + dy); }
+      else { c.moveTo(cx + dx, top + h + dy); c.lineTo(cx - w / 2 + dx, top + dy); c.lineTo(cx + w / 2 + dx, top + dy); }
+      c.closePath();
+      c.fillStyle = fill;
+      c.fill();
+    };
+    path(1, 1, '#0a0d06');
+    path(0, 0, colour);
+  }
+
+  /** The control legend: an arrow and its word, twice, centred as one block. */
+  legend(top, size) {
+    const c = this.ctx;
+    c.font = `bold ${size}px "Arial Black", "Helvetica Neue", Arial, sans-serif`;
+    const aw = size * 1.05, gap = 3, pad = 14;
+    const wJump = c.measureText('JUMP').width;
+    const wDuck = c.measureText('DUCK').width;
+    let x = (this.w - (aw * 2 + gap * 2 + wJump + wDuck + pad)) / 2;
+    this.tri(x + aw / 2, top + 1, size, true, DIM);
+    x += aw + gap;
+    this.text('JUMP', x, top, DIM, 'left', size);
+    x += wJump + pad;
+    this.tri(x + aw / 2, top + 1, size, false, DIM);
+    x += aw + gap;
+    this.text('DUCK', x, top, DIM, 'left', size);
+  }
+
   draw(state, score, best, t) {
     const c = this.ctx;
     c.clearRect(0, 0, this.w, this.h);
@@ -71,12 +109,12 @@ export class Hud {
          than a float. Rounding costs the motion its smoothness and buys back
          the crispness, which at this resolution is the better trade. */
       const bob = Math.round(Math.sin(t * 2.1) * 2);
-      this.text('PRESS SPACE TO RUN', this.w / 2, this.h / 2 - 30 + bob, BRIGHT, 'center', 14);
-      this.text('SPACE JUMP  \u00B7  DOWN DUCK', this.w / 2, this.h / 2 - 12 + bob, DIM, 'center', 9);
+      this.text('PRESS UP TO RUN', this.w / 2, this.h / 2 - 30 + bob, BRIGHT, 'center', 14);
+      this.legend(this.h / 2 - 11 + bob, 9);
     } else if (state === 'dead') {
       this.text('OUCH', this.w / 2, this.h / 2 - 38, BRIGHT, 'center', 28);
       if (Math.floor(t * 2) % 2 === 0) {
-        this.text('SPACE TO RUN AGAIN', this.w / 2, this.h / 2 - 2, BRIGHT, 'center', 12);
+        this.text('PRESS UP TO RUN AGAIN', this.w / 2, this.h / 2 - 2, BRIGHT, 'center', 12);
       }
     }
     this.tex.needsUpdate = true;
