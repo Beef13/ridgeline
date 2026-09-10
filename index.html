@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ridge Run</title>
     <meta name="description" content="An endless runner rendered through a 1994 output stage." />
-    <link rel="icon" href="./logo.png" />
+    <!-- The mark is trimmed of its transparent margin and resampled per size:
+         a browser scaling one 1000px image down to 16 makes a smear of it.
+         Apple ignores transparency and composites onto black, so that one is
+         given the site's own ground rather than letting the OS pick. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="256x256" href="./icon.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <style>
       :root {
         --ground: #060e08;      /* the cabinet the screen sits in */

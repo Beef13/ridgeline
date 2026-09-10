@@ -36,7 +36,8 @@ jobs:
       # .gitignore was swallowing it; this makes that a red build instead.
       - name: Check the build has its assets
         run: |
-          for f in dist/logo.png dist/design.json dist/art/index.json \
+          for f in dist/logo.png dist/favicon-32.png dist/icon.png \
+                   dist/apple-touch-icon.png dist/design.json dist/art/index.json \
                    dist/audio/jump.mp3 dist/audio/duck.mp3 dist/audio/crash.mp3 \
                    dist/audio/ethnic-flute-ambient.mp3; do
             [ -s "$f" ] || { echo "::error::missing from the build: $f"; exit 1; }
