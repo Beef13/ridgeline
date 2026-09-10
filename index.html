@@ -34,6 +34,25 @@
         -webkit-user-select: none;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
+        /* The one that stops iOS. `user-select: none` kills the selection
+           itself, but Safari still runs its own long-press gesture on top —
+           the callout menu and, since iOS 17, the magnifier loupe. Holding to
+           duck IS a long press, so without this every duck raises a lens over
+           the screen. It does not inherit reliably across shadow boundaries
+           and form controls, hence the catch-all below. */
+        -webkit-touch-callout: none;
+      }
+      *, *::before, *::after {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* A held finger on the logo otherwise lifts a drag ghost of the PNG,
+         and the drag cancels the pointer stream mid-gesture. */
+      img {
+        -webkit-user-drag: none;
+        user-drag: none;
+        pointer-events: none;
       }
       body {
         color: var(--score);
