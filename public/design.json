@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "saved": "2026-09-10 07:46",
+  "saved": "2026-09-10 08:43",
   "raster": {
     "w": 256,
     "h": 224,
@@ -49,8 +49,8 @@
     "fog": {
       "on": true,
       "hex": "#0787c5",
-      "near": 118,
-      "far": 232,
+      "near": 120,
+      "far": 220,
       "vistas": true
     }
   },
@@ -71,12 +71,12 @@
   "crt": {
     "on": true,
     "soft": 0.91,
-    "scan": 0.13,
-    "mask": 0.22,
+    "scan": 0.11,
+    "mask": 0.15,
     "glow": 0.69,
     "curve": 0.245,
-    "vign": 0.25,
-    "gain": 1.61
+    "vign": 0.67,
+    "gain": 1.6
   },
   "materials": "flat",
   "ground": {
@@ -495,7 +495,7 @@
   "game": {
     "startSpeed": 4.2,
     "maxSpeed": 17,
-    "speedRamp": 0.09,
+    "speedRamp": 0.04,
     "duckSpeedMul": 0.92,
     "standW": 0.62,
     "standH": 1.62,
@@ -507,7 +507,8 @@
     "poseFps": 12,
     "camBehind": 2.4,
     "camLerpY": 5,
-    "obstacleWarm": 0.55,
-    "cornerRadius": 0.075
+    "obstacleWarm": 1,
+    "cornerRadius": 0.075,
+    "screenGlow": 0.29
   }
 }

@@ -34,7 +34,8 @@ export const look = {
      design's `game` block, which the bench ignores and COPY DESIGN writes. */
   obstacleWarm: d.game?.obstacleWarm ?? 0.55,
   // Also not a bench number — the bench has no cabinet around its viewport.
-  cornerRadius: d.game?.cornerRadius ?? 0
+  cornerRadius: d.game?.cornerRadius ?? 0,
+  screenGlow: d.game?.screenGlow ?? 0
 };
 
 const PAL = { quantise: 'uQuant', ditherMode: 'uMode', blend: 'uDither', pairLimit: 'uPair' };
@@ -61,6 +62,7 @@ export function pushLook(pipeline, vistas, world) {
   world.setFog(look.fog > 0.5, look.fogNear, look.fogFar);
   tintObstacles(look.obstacleWarm);
   pipeline.setCornerRadius(look.cornerRadius);
+  pipeline.setGlow(look.screenGlow);
 }
 
 export const LOOK_GROUPS = () => [
@@ -79,6 +81,6 @@ export const LOOK_GROUPS = () => [
   ['Tube', look, [
     ['crt', 0, 1, 1], ['beam', 0, 1, 0.01], ['scanlines', 0, 0.9, 0.01], ['mask', 0, 0.8, 0.01],
     ['halation', 0, 1, 0.01], ['curvature', 0, 0.3, 0.005], ['vignette', 0, 1, 0.01], ['gain', 0.6, 2, 0.01],
-    ['cornerRadius', 0, 0.5, 0.005]
+    ['cornerRadius', 0, 0.5, 0.005], ['screenGlow', 0, 1, 0.01]
   ]]
 ];

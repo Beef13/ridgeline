@@ -56,7 +56,7 @@ export function captureDesign(view) {
   d.time = { ...d.time, fps: feel.poseFps };
 
   d.feel = { ...d.feel, ...pick(feel, BENCH_FEEL) };
-  d.game = { ...(d.game || {}), ...pick(feel, GAME_FEEL), obstacleWarm: look.obstacleWarm, cornerRadius: look.cornerRadius };
+  d.game = { ...(d.game || {}), ...pick(feel, GAME_FEEL), obstacleWarm: look.obstacleWarm, cornerRadius: look.cornerRadius, screenGlow: look.screenGlow };
   return d;
 }
 

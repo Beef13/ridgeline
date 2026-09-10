@@ -23,7 +23,10 @@ const VIEW_H = 7.2;                       // world units visible vertically
 const view = { fov: 14, internalW: 256, internalH: 224 };
 
 const stage = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ antialias: false });
+/* alpha, because the tube pass now writes the SHAPE of the screen into the
+   canvas: everything outside the glass is transparent, so the page shows
+   through and there is no black frame for the glow to trace. */
+const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x241a38, 1);
 renderer.autoClear = false;               // the HUD draws over the scene, in-buffer
@@ -77,6 +80,12 @@ const sfx = new Sfx();
    not make a sound. At a 120Hz fixed step this is at most 8ms after the key. */
 player.onAction = (what) => sfx.play(what === 'doubleJump' ? 'jump' : what,
                                      what === 'doubleJump' ? 1.18 : 1);
+
+/* A bell on every hundred metres. Counted in WHOLE hundreds crossed rather
+   than by testing the distance against a multiple: distance advances by a
+   fraction of a metre per step, so a proximity test either fires several
+   times on the same hundred or misses one entirely at speed. */
+let bellsRung = 0;
 // M mutes the music; it should mute the effects with it, or half the game
 // goes quiet and the player assumes the key is broken
 addEventListener('keydown', (e) => { if (e.code === 'KeyM') sfx.setMuted(music.muted); });
@@ -93,12 +102,12 @@ let deadAt = 0;
 const hiscoreEl = document.getElementById('hiscore');
 function showBest() {
   if (!hiscoreEl) return;
-  hiscoreEl.innerHTML = 'HIGH SCORE: ' +
-    String(Math.floor(best)).padStart(4, '0') + '<span class="m">m</span>';
+  hiscoreEl.innerHTML = 'HIGH SCORE: ' + Math.floor(best) + '<span class="m">m</span>';
 }
 showBest();
 
 function restart() {
+  bellsRung = 0;
   player.reset();
   obstacles.reset();
   streamer.reset();
@@ -145,8 +154,6 @@ function resize() {
   stage.style.height = cssH + 'px';
   renderer.domElement.style.width = cssW + 'px';
   renderer.domElement.style.height = cssH + 'px';
-  // the radius is a fraction of the screen, so it has to follow the screen
-  pipeline.applyCorner();
   camera.aspect = pipeline.width / pipeline.height;
   camera.updateProjectionMatrix();
 }
@@ -203,6 +210,8 @@ startLoop({
     if (state !== STATE.RUNNING) return;
 
     player.step(dt, inp, true);
+    const hundreds = Math.floor(player.distance / 100);
+    if (hundreds > bellsRung) { bellsRung = hundreds; sfx.play('bell'); }
     streamer.update(player.x);
     obstacles.update(player, true, dt);
 
@@ -263,6 +272,7 @@ startLoop({
 
     hud.draw(state, player.distance, best, t);
     pipeline.render(scene, camera, hud.scene, hud.cam);
+    pipeline.sampleGlow();   // must be inside the frame, while the buffer still holds it
     if (veilUp) { framesDrawn++; liftVeil(); }
 
     camera.position.x = cx; camera.position.y = cy;

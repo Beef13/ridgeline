@@ -14,7 +14,7 @@
  */
 const BASE = ((typeof import.meta.env !== 'undefined' && import.meta.env.BASE_URL) || '/') + 'audio/';
 
-const CLIPS = { jump: 'jump.mp3', duck: 'duck.mp3', crash: 'crash.mp3' };
+const CLIPS = { jump: 'jump.mp3', duck: 'duck.mp3', crash: 'crash.mp3', bell: 'bell.mp3' };
 
 export class Sfx {
   constructor(volume = 0.75) {

@@ -46,7 +46,7 @@ export class Pipeline {
         uRes: { value: new THREE.Vector2(width, height) },
         uOn: { value: 0 }, uSoft: { value: 0.4 }, uScan: { value: 0.22 },
         uMask: { value: 0.1 }, uGlow: { value: 0.3 }, uCurve: { value: 0 },
-        uVign: { value: 0.18 }, uGain: { value: 1.08 }
+        uVign: { value: 0.18 }, uGain: { value: 1.08 }, uRadius: { value: 0 }
       },
       vertexShader: fullscreenVert,
       fragmentShader: tubeFrag,
@@ -69,24 +69,80 @@ export class Pipeline {
 
   /** Fit to the container at a whole-number scale, and report it. */
   /**
-   * Corner fillet, as a fraction of the SHORTER side of the screen.
+   * Corner fillet, as a fraction of the shorter side of the PICTURE.
    *
-   * Done by clipping the canvas element rather than masking in the tube pass.
-   * The shader was the obvious place and the wrong one: barrel distortion
-   * already blacks out the extreme corners, so a mask there removed pixels
-   * that were black anyway and nothing changed on screen. Clipping the element
-   * lets the page ground show through, which is what makes the curve visible.
+   * Cut in the tube pass rather than clipped off the canvas element. Clipping
+   * the element rounded the canvas rectangle — but the picture is barrel-bent
+   * and sits inside that rectangle, so the corner being rounded belonged to a
+   * black frame around the tube rather than to the tube itself.
    */
   setCornerRadius(frac) {
     this.corner = Math.max(0, Math.min(0.5, frac || 0));
-    this.applyCorner();
+    this.tubeMat.uniforms.uRadius.value = this.corner;
   }
 
-  applyCorner() {
+  /**
+   * Light spill around the tube.
+   *
+   * A real CRT throws its picture onto the wall behind it, so the glow has to
+   * follow what is on screen — a fixed colour reads as a sticker, not as light.
+   * The frame's average is taken by drawing the canvas into a 1x1 context,
+   * which makes the BROWSER do the box filter on the GPU; reading the pixels
+   * back out of WebGL ourselves would stall the pipeline every time.
+   *
+   * Sampled every sixth frame and eased toward, not snapped. At full rate it
+   * costs more than it is worth, and a hard cut makes the wall flicker on
+   * every jump between sky and undergrowth.
+   */
+  setGlow(amount) {
+    this.glow = Math.max(0, Math.min(1, amount || 0));
+    this.applyGlow();
+  }
+
+  sampleGlow() {
+    if (!this.glow) return;
+    this._gframe = (this._gframe | 0) + 1;
+    if (this._gframe % 6) return;
+    if (!this._gctx) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 1;
+      this._gctx = c.getContext('2d', { willReadFrequently: true });
+    }
+    try {
+      this._gctx.clearRect(0, 0, 1, 1);
+      this._gctx.drawImage(this.renderer.domElement, 0, 0, 1, 1);
+      const d = this._gctx.getImageData(0, 0, 1, 1).data;
+      /* The canvas is transparent outside the glass, so averaging it to one
+         pixel drags the colour toward nothing. Divide the mean back out by the
+         mean coverage to get the colour of the LIT part alone. */
+      const cov = d[3] / 255;
+      if (cov < 0.05) return;
+      const now = [0, 1, 2].map((i) => Math.min(255, d[i] / cov));
+      const prev = this.glowRGB || now;
+      this.glowRGB = [0, 1, 2].map((i) => Math.round(prev[i] + (now[i] - prev[i]) * 0.22));
+      this.applyGlow();
+    } catch (e) { /* unreadable this frame; keep the colour we had */ }
+  }
+
+  applyGlow() {
     const el = this.renderer.domElement;
-    const w = parseFloat(el.style.width) || el.width;
-    const h = parseFloat(el.style.height) || el.height;
-    el.style.borderRadius = (this.corner || 0) * Math.min(w, h) + 'px';
+    el.style.boxShadow = 'none';
+    if (!this.glow) { el.style.filter = 'none'; return; }
+    const c = this.glowRGB || [110, 130, 110];
+    // lifted, because the frame average is always duller than the light a tube
+    // actually throws — and clamped, or a bright sky blows the wall out
+    const lift = (v) => Math.min(255, Math.round(v * 1.45 + 12));
+    const rgb = `${lift(c[0])}, ${lift(c[1])}, ${lift(c[2])}`;
+    /* drop-shadow, not box-shadow: box-shadow traces the element's RECTANGLE,
+       and the element is now mostly transparent with a curved tube in the
+       middle of it. drop-shadow traces the alpha, so the light follows the
+       glass. Two of them — a tight core and a wide halo — because a single
+       blur either hugs too close or washes out. */
+    const near = Math.round(4 + 26 * this.glow);
+    const far = Math.round(14 + 90 * this.glow);
+    el.style.filter =
+      `drop-shadow(0 0 ${near}px rgba(${rgb}, ${(0.55 * this.glow).toFixed(3)})) ` +
+      `drop-shadow(0 0 ${far}px rgba(${rgb}, ${(0.42 * this.glow).toFixed(3)}))`;
   }
 
   fit(containerW, containerH) {

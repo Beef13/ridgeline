@@ -100,8 +100,8 @@ export class Hud {
     /* Two shades, one job each: what you are doing now is bright, what you
        have to beat sits under it dimmer. Same hue, so they read as one block
        rather than two unrelated numbers. */
-    this.text(String(Math.floor(score)).padStart(5, '0'), this.w - 5, 5, BRIGHT, 'right', 13);
-    this.text('HI ' + String(Math.floor(best)).padStart(5, '0'), this.w - 5, 20, DIM, 'right', 9);
+    this.text(String(Math.floor(score)) + 'M', this.w - 5, 5, BRIGHT, 'right', 13);
+    this.text('HI ' + String(Math.floor(best)) + 'M', this.w - 5, 20, DIM, 'right', 9);
 
     if (state === 'ready') {
       /* Whole pixels only. The buffer is 256 across, so a fractional offset

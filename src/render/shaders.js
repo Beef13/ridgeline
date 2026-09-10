@@ -71,7 +71,7 @@ export const tubeFrag = /* glsl */`
   varying vec2 vUv;
   uniform sampler2D tPal;
   uniform vec2 uRes;
-  uniform float uOn, uSoft, uScan, uMask, uGlow, uCurve, uVign, uGain;
+  uniform float uOn, uSoft, uScan, uMask, uGlow, uCurve, uVign, uGain, uRadius;
 
   // A finite electron beam covers part of a pixel instead of snapping between
   // them. Widening this window is what softens the grid without blurring the
@@ -84,6 +84,25 @@ export const tubeFrag = /* glsl */`
     return (i + clamp(f / w, -0.5, 0.5)) / uRes;
   }
   vec3 tap(vec2 uv) { return texture2D(tPal, clamp(uv, 0.0005, 0.9995)).rgb; }
+  /**
+   * The silhouette of the glass, as a signed distance to a rounded box —
+   * measured in the PICTURE's own space, so the curve bends it along with
+   * everything else and the rounded corner is the corner of the image.
+   *
+   * This also replaces the old hard test for "outside the picture". That cut
+   * a stair-stepped edge and, worse, filled the rest of the canvas with black:
+   * a square frame around a curved tube, which is exactly what the rounding
+   * and the glow were then following.
+   */
+  float glass(vec2 uv) {
+    vec2 aspect = vec2(uRes.x / uRes.y, 1.0);
+    vec2 p = (uv - 0.5) * 2.0 * aspect;
+    float r = max(uRadius, 0.0) * min(aspect.x, aspect.y);
+    vec2 d = abs(p) - (aspect - r);
+    float dist = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
+    return 1.0 - smoothstep(-0.012, 0.006, dist);
+  }
+
   vec2 curve(vec2 uv) {
     vec2 c = uv * 2.0 - 1.0;
     vec2 off = abs(c.yx) / vec2(5.0, 4.0);
@@ -96,13 +115,13 @@ export const tubeFrag = /* glsl */`
     if (uOn < 0.5) {
       vec2 p = vUv * uRes;
       col = texture2D(tPal, (floor(p) + 0.5) / uRes).rgb;
-      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+      float m = glass(vUv);
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0) * m, m);
       return;
     }
     vec2 uv = curve(vUv);
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return;
-    }
+    float mask = glass(uv);
+    if (mask <= 0.0) { gl_FragColor = vec4(0.0); return; }
     vec2 suv = beam(uv);
     col = tap(suv);
 
@@ -127,6 +146,8 @@ export const tubeFrag = /* glsl */`
       vec2 v = uv * (1.0 - uv.yx);
       col *= mix(1.0, pow(clamp(v.x * v.y * 16.0, 0.0, 1.0), 0.28), uVign);
     }
-    gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    /* Premultiplied: three's context expects it, and it is what makes the
+       feathered edge composite against the page instead of against black. */
+    gl_FragColor = vec4(clamp(col, 0.0, 1.0) * mask, mask);
   }
 `;
