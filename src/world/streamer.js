@@ -3,6 +3,8 @@ import { SRGB } from '../core/colour.js';
 import { heightAt, buildCliffChunk, disposeGroup } from './terrain.js';
 import { frondTexture, bladeTexture, treeTexture } from './art.js';
 import { LAYERS } from './scene.js';
+import { design } from '../design.js';
+import { ScatterArt } from './scatterart.js';
 
 /**
  * Keeps a rolling window of ground and scenery around the player. Chunks are
@@ -97,7 +99,18 @@ function dressChunk(x0, x1) {
 }
 
 /**
- * Parallax scatter, now drawn art rather than cones. Distant layers converge
+ * Everything below — the ground dressing and the parallax bands — is STAND-IN
+ * art, procedural stuff to keep the ridge from being bare before there was any
+ * real art to put on it. `ground.dress` is the one switch that turns the lot
+ * off, and the bench sets it false the moment you start sowing your own. Two
+ * switches would guarantee exactly the bug this fixed: a layer of built-in
+ * scenery still standing behind art you placed, with nothing in the bench to
+ * explain where it came from.
+ */
+const BUILT_IN = design.ground?.dress !== false;
+
+/**
+ * Parallax scatter, drawn art rather than cones. Distant layers converge
  * toward the horizon, so their bases sit well BELOW the play plane or they
  * fill the sky instead of standing behind it.
  */
@@ -132,6 +145,13 @@ export class Streamer {
   constructor(roots) {
     this.roots = roots;
     this.chunks = new Map();
+
+    /* Scattered art arrives over the network, so the first chunks are built
+       without it. Rebuilding once it lands is cheaper and simpler than trying
+       to graft instances into chunks that already exist. */
+    this.scatter = new ScatterArt();
+    this.scatter.onReady = () => { const at = this.lastX ?? 0; this.reset(); this.update(at); };
+    this.scatter.load();
   }
 
   reset() {
@@ -144,17 +164,28 @@ export class Streamer {
     const groups = [];
     const cliff = buildCliffChunk(x0, x1);
     this.roots[1].add(cliff); groups.push(cliff);
-    const dress = dressChunk(x0, x1);
-    this.roots[1].add(dress); groups.push(dress);
-    for (const s of SCATTER) {
-      const g = layerScatter(s, x0, x1);
-      this.roots[s.root].add(g);
-      groups.push(g);
+    if (BUILT_IN) {
+      const dress = dressChunk(x0, x1);
+      this.roots[1].add(dress); groups.push(dress);
+    }
+    // sown art goes to the layer its asset was placed on, at that layer's depth
+    for (const li of this.scatter.worldLayers()) {
+      const sown = this.scatter.chunk(x0, x1, li);
+      this.roots[li].add(sown);
+      groups.push(sown);
+    }
+    if (BUILT_IN) {
+      for (const s of SCATTER) {
+        const g = layerScatter(s, x0, x1);
+        this.roots[s.root].add(g);
+        groups.push(g);
+      }
     }
     this.chunks.set(i, { groups });
   }
 
   update(x) {
+    this.lastX = x;
     const c = Math.floor(x / CHUNK);
     for (let i = c - BEHIND; i <= c + AHEAD; i++) if (!this.chunks.has(i)) this.build(i);
     for (const [i, chunk] of this.chunks) {

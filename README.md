@@ -43,10 +43,10 @@ rather than purely reflexive — you have to identify which answer applies.
 
 | | |
 |---|---|
-| **boulder** | low and wide — a normal jump |
-| **spire** | tall — needs a full-height jump; a clipped one kills you |
-| **arch** | an overhang with clear air beneath — you must duck; jumping kills you |
-| **raptor** | a flyer at one of two altitudes — jump the low one, duck the high one |
+| **crate** | a timber crate, low and wide — a normal jump |
+| **fence** | a length of timber fence, tall — needs a full-height jump; a clipped one kills you |
+| **sign** | a trail signpost cantilevered over the path, clear air beneath — you must duck; jumping kills you |
+| **raptor** | a flyer — jump the low one, duck the high one. Past ~320m they start climbing and diving between the two, so the answer is only settled when you get there |
 
 Difficulty is **spacing**, not speed. Speed ramps on its own; the gap between
 obstacles is derived from current speed times a reaction window, so the game
@@ -67,6 +67,11 @@ of truth to drift. Chunks are just mesh windows onto it, built ahead and thrown
 away behind, which is what makes the level endless without the scene graph
 growing.
 
+**The ground owns no shape of its own.** Every number `heightAt` uses comes from
+`design.ground`, so the bench is the only place terrain gets designed. The bed
+heights vary per block but are derived from *world* x, never chunk-local — get
+that wrong and every chunk seam shows as a step in the cliff face.
+
 **Feel lives in `src/player/tuning.js`.** Every number is a live slider,
 because feel is found by dragging, not by editing a file and reloading — you
 lose the comparison in the reload. **Copy settings** puts the tuned block on
@@ -81,11 +86,12 @@ The three levers that matter most, none of which show up in a screenshot:
 ## Layout
 
     src/render/   palette, shaders, the two-pass pipeline
-    src/world/    terrain height function + chunk meshes, streamer, obstacles, sky
+    src/world/    terrain height function + chunk meshes, streamer, scatter, sky
     src/player/   runner controller, tuning numbers, stand-in figure
     src/core/     fixed-step loop, input, colour helper
     src/ui/       in-buffer HUD, live tuning panel
     src/design.js the bench export — replace this whole file to redesign
+                  (its `ground` block drives terrain.js: shape, beds, colours)
     tools/        the prerender bench (open the .html directly)
     test/         logic tests (no browser) + Playwright browser tests
     public/art/   vista PNGs, transparent-backed
@@ -109,6 +115,12 @@ planes stepped back in z instead.
 **The frame clamp.** `startLoop` caps each frame at 0.1s to prevent a spiral of
 death, which means a machine too slow to hold ~10fps runs the game in slow
 motion rather than skipping ahead. Fair, but worth knowing.
+
+**Scattered art is a rule, not a placement.** `scatterart.js` reads the bench's
+per-asset rule (how many per 100 units, size range, depth spread) and derives
+every instance from world x alone — never from the chunk index. Seed off the
+chunk and the ridge reshuffles itself as you run along it, and instances vanish
+at every seam. `test/scatter.mjs` asserts the chunking is a true partition.
 
 **Looping music.** `<audio loop>` is not usable: the track ends on a fade-out,
 so looping fades to silence then jumps back at full level. `src/core/audio.js`

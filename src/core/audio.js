@@ -11,7 +11,7 @@
  * — decoding 7.5 minutes into a Web Audio buffer would cost well over 100 MB.
  */
 export const MUSIC = {
-  src: '/audio/ethnic-flute-ambient.mp3',
+  src: ((typeof import.meta.env !== 'undefined' && import.meta.env.BASE_URL) || '/') + 'audio/ethnic-flute-ambient.mp3',
   loopTail: 18,     // seconds from the end at which to bring the next copy in
   crossfade: 6,     // seconds to blend over
   volume: 0.55,

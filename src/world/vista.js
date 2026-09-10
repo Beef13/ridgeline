@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { design, ART_DIR } from '../design.js';
 import { fitImage, canvasTexture, loadImage } from '../render/fit.js';
 import { ridgeTexture } from './art.js';
+import { resolveArt } from '../render/artindex.js';
 
 /**
  * Distant bands. A vista is not really "far away" — it is a cheat. Real
@@ -19,12 +20,26 @@ const FALLBACK = [
 ];
 
 export class Vistas {
-  constructor(scene) {
+  constructor(scene, scatter) {
     this.master = design.optics.vistaMaster;
     this.horizon = design.optics.vistaHorizon;
     this.tint = design.atmos.tints[5] ?? 1;
 
-    const specs = design.assets.filter((a) => a.kind === 'image' && a.layer === 5);
+    /* Art sown ON the vista layer is camera-locked like a band, so it is driven
+       here rather than streamed — a chunk that scrolls past would take it with
+       it. The groups arrive empty and fill in when the art decodes. */
+    this.sown = [];
+    if (scatter) {
+      const attach = () => {
+        this.sown.forEach((s) => s.group.removeFromParent());
+        this.sown = scatter.vistaBands();
+        this.sown.forEach((s) => scene.add(s.group));
+      };
+      if (scatter.ready) attach();
+      else { const prev = scatter.onReady; scatter.onReady = () => { if (prev) prev(); attach(); }; }
+    }
+
+    const specs = design.assets.filter((a) => a.kind === 'image' && a.layer === 5 && !(a.scatter && a.scatter.on));
     this.bands = specs.map((spec, i) => {
       const mesh = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
@@ -53,7 +68,7 @@ export class Vistas {
   async load() {
     for (const b of this.bands) {
       try {
-        const img = await loadImage(ART_DIR + encodeURIComponent(b.spec.file));
+        const img = await loadImage(ART_DIR + encodeURIComponent(await resolveArt(b.spec.file)));
         const c = fitImage(img, b.spec.fitW, b.spec.fitQuant, b.spec.fitDither);
         const old = b.mesh.material.map;
         b.mesh.material.map = canvasTexture(c);
@@ -87,6 +102,17 @@ export class Vistas {
       b.mesh.position.z = -s.depth;
       const h = s.h;
       b.mesh.scale.set(h * b.aspect * (s.flip ? -1 : 1), h, 1);
+    }
+    /* Sown instances lag by their own drift, same rule — but because they lag,
+       the band slides out from under the camera and the sky would eventually
+       empty. The layout tiles exactly, so shifting it by whole bands keeps it
+       centred forever and the repeat cannot be seen. */
+    for (const g of this.sown) {
+      const d = Math.min(0.98, g.drift * this.master);
+      let x = camX * (1 - d);
+      if (g.wide) x -= g.wide * Math.round((x - camX) / g.wide);
+      g.group.position.x = snap(x);
+      g.group.position.y = snap(camY * (1 - d * 0.6) + this.horizon);
     }
   }
 }

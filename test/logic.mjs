@@ -4,6 +4,7 @@
  */
 import { Runner } from '../src/player/controller.js';
 import { feel } from '../src/player/tuning.js';
+import { heightAt } from '../src/world/terrain.js';
 
 const DT = 1 / 120;
 const NONE = { jumpHeld: false, jumpPressed: false, duck: false, anyPressed: false };
@@ -15,7 +16,7 @@ const run = (script, steps) => {
   const log = [];
   for (let i = 0; i < steps; i++) {
     p.step(DT, { ...NONE, ...script(i, p) }, true);
-    log.push({ i, y: p.y, vy: p.vy, grounded: p.grounded, ducking: p.ducking, jumping: p.jumping });
+    log.push({ i, x: p.x, y: p.y, vy: p.vy, grounded: p.grounded, ducking: p.ducking, jumping: p.jumping });
   }
   return { p, log };
 };
@@ -36,11 +37,13 @@ const run = (script, steps) => {
   check('duck resumes on landing', after.length > 0 && after[after.length - 1].ducking);
 }
 
-// 3. Variable jump height: tap vs hold must differ clearly.
+/* 3. Variable jump height: tap vs hold must differ clearly.
+   Measured as CLEARANCE ABOVE THE GROUND BENEATH, not above the starting y —
+   the runner is moving right the whole time, so on a rising ridge the terrain
+   itself lifts them and an absolute measurement reads the hill as jump height. */
 const apex = (holdFor) => {
   const { log } = run((i) => ({ jumpPressed: i === 5, jumpHeld: i >= 5 && i < 5 + holdFor }), 300);
-  const y0 = log[0].y;
-  return Math.max(...log.map(f => f.y)) - y0;
+  return Math.max(...log.map(f => f.y - heightAt(f.x)));
 };
 {
   const tap = apex(2), held = apex(200);

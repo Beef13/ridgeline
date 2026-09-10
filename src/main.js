@@ -13,8 +13,7 @@ import { startLoop } from './core/loop.js';
 import { Music } from './core/audio.js';
 import { Vistas } from './world/vista.js';
 import { Hud } from './ui/hud.js';
-import { mountTuner } from './ui/tuner.js';
-import { mountLook, look } from './ui/look.js';
+import { pushLook } from './ui/look.js';
 import { design, FEEL_KEYS_THAT_TRANSFER } from './design.js';
 import { snapshotPalette } from './render/grade.js';
 import { cue } from './world/streamer.js';
@@ -52,8 +51,10 @@ cue.cool = design.atmos.cool;
 const camera = new THREE.PerspectiveCamera(view.fov, view.internalW / view.internalH, 0.5, 600);
 const camDist = () => (VIEW_H / 2) / Math.tan(THREE.MathUtils.degToRad(view.fov) / 2);
 
-const vistas = new Vistas(scene);
+/* The streamer owns the scatter loader, and the vistas need it for anything
+   sown on their layer — so it is built first and handed over. */
 const streamer = new Streamer(roots);
+const vistas = new Vistas(scene, streamer.scatter);
 const obstacles = new ObstacleField(roots[1]);
 const player = new Runner();
 const fig = makeFigure();
@@ -77,8 +78,13 @@ function restart() {
   state = STATE.RUNNING;
 }
 
-mountTuner(feel, view, music);
-mountLook(pipeline, vistas, { setFog });
+// the look always applies; the sliders that tune it are development only, and
+// the dynamic import is what lets the release build drop them entirely
+pushLook(pipeline, vistas, { setFog });
+if (import.meta.env.DEV) {
+  import('./ui/panels.js').then((m) =>
+    m.mountPanels({ pipeline, vistas, world: { setFog }, feel, view, music }));
+}
 // The vista layer's own tint is the sixth entry in the bench's list.
 vistas.setTint(design.atmos.tints[5] ?? 1);
 
@@ -110,7 +116,7 @@ startLoop({
 
     player.step(dt, inp, true);
     streamer.update(player.x);
-    obstacles.update(player, true);
+    obstacles.update(player, true, dt);
 
     const box = player.box;
     for (const o of obstacles.boxes()) {

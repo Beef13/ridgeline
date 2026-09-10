@@ -1,0 +1,46 @@
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:          # so you can redeploy without a commit
+
+# What Pages needs to accept a build from Actions rather than from a branch.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A deploy already running is stale the moment a newer commit lands.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # The logic tests need no browser and take about a second. Running them
+      # here means a broken jump curve or a scatter regression never reaches
+      # the live site — the build simply stops.
+      - run: npm run test:logic
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
