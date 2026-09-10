@@ -11,6 +11,7 @@ import { makeFigure, poseFigure } from './player/figure.js';
 import { Input } from './core/input.js';
 import { startLoop } from './core/loop.js';
 import { Music } from './core/audio.js';
+import { Sfx } from './core/sfx.js';
 import { Vistas } from './world/vista.js';
 import { Hud } from './ui/hud.js';
 import { pushLook } from './ui/look.js';
@@ -70,11 +71,32 @@ roots[1].add(fig.group);
 const hud = new Hud(view.internalW, view.internalH);
 const input = new Input();
 const music = new Music();
+const sfx = new Sfx();
+/* The controller reports the action it actually took, not the key that was
+   pressed: a jump with no air jumps left, or a duck cancelled by a jump, must
+   not make a sound. At a 120Hz fixed step this is at most 8ms after the key. */
+player.onAction = (what) => sfx.play(what === 'doubleJump' ? 'jump' : what,
+                                     what === 'doubleJump' ? 1.18 : 1);
+// M mutes the music; it should mute the effects with it, or half the game
+// goes quiet and the player assumes the key is broken
+addEventListener('keydown', (e) => { if (e.code === 'KeyM') sfx.setMuted(music.muted); });
 
 let state = STATE.READY;
 let best = 0;
 try { best = parseFloat(localStorage.getItem('ridgeline.best') || '0') || 0; } catch (e) {}
 let deadAt = 0;
+
+/* The high score is shown OUTSIDE the frame, in the page around it. The HUD
+   inside the 256x224 buffer stays as it is — that has to be quantised with
+   everything else or it breaks the illusion — but a personal best belongs to
+   the cabinet, not to the game, so it lives in the DOM at full resolution. */
+const hiscoreEl = document.getElementById('hiscore');
+function showBest() {
+  if (!hiscoreEl) return;
+  hiscoreEl.innerHTML = 'HIGH SCORE: ' +
+    String(Math.floor(best)).padStart(4, '0') + '<span class="m">m</span>';
+}
+showBest();
 
 function restart() {
   player.reset();
@@ -96,27 +118,84 @@ if (import.meta.env.DEV) {
 vistas.setTint(design.atmos.tints[5] ?? 1);
 
 function resize() {
-  const { w, h } = pipeline.fit(stage.clientWidth, stage.clientHeight);
-  renderer.domElement.style.width = w + 'px';
-  renderer.domElement.style.height = h + 'px';
+  /* Measure against the free space, then PIN the stage to what actually fits.
+     The screen only scales in whole multiples of 256x224, so there is almost
+     always leftover — and a stage that keeps it sits as a dead band under the
+     screen, which is what made the page look bottom-heavy. Handing it back
+     lets the column centre and the gap above match the gap below. */
+  stage.style.flex = '1 1 auto';
+  stage.style.height = 'auto';
+  const budgetH = stage.clientHeight;             // reading it forces the layout
+  const budgetW = stage.clientWidth;
+
+  /* Two scales, deliberately. The RENDER stays a whole multiple of 256x224 —
+     that is what the palette pass and the tube pass are built on and it must
+     not be fractional. The DISPLAY then stretches that buffer to fill the box,
+     which is how the screen uses the leftover of a step instead of leaving it
+     as empty page. The stretch is small (never more than one step's worth) and
+     the tube pass has already done the hard-edged work by then. */
+  const { w, h } = pipeline.fit(budgetW, budgetH);
+  /* 0.95 leaves the screen a little short of its box on purpose — filling it
+     edge to edge made the page feel cramped. Everything above scales with it,
+     so the marquee and the screen keep the same relationship. */
+  const k = Math.max(1, Math.min(budgetW / w, budgetH / h) * 0.95);
+  const cssW = Math.round(w * k), cssH = Math.round(h * k);
+
+  stage.style.flex = '0 0 auto';
+  stage.style.height = cssH + 'px';
+  renderer.domElement.style.width = cssW + 'px';
+  renderer.domElement.style.height = cssH + 'px';
   camera.aspect = pipeline.width / pipeline.height;
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
+/* The logo decides how much height is left for the screen, and it arrives
+   after first paint. Watching the stage instead would loop: resize() sets the
+   stage's own height. */
+const logoEl = document.getElementById('logo');
+if (logoEl) logoEl.addEventListener('load', resize);
 resize();
 streamer.update(0);
 camera.position.set(feel.camBehind, 2.6, camDist());
 
-window.__dbg = { player, streamer, obstacles, camera, roots, state: () => state, pipeline, scene, vistas, music };
+/* Lift the veil when the art has actually arrived AND a frame has been drawn
+   with it. Either alone is a lie: the scatter can be ready before anything is
+   on screen, and the first frame can render before a single texture decodes. */
+let framesDrawn = 0, veilUp = true;
+let artReady = streamer.scatter.ready;
+{
+  /* Both conditions must be able to RETRY the lift. Checking only from the
+     render loop meant that once enough frames had gone by — about a tenth of a
+     second — nothing asked again, and a veil waiting on art that arrived a
+     second later sat there until the failsafe fired. */
+  const prev = streamer.scatter.onReady;
+  streamer.scatter.onReady = () => { if (prev) prev(); artReady = true; liftVeil(); };
+}
+function liftVeil() {
+  if (!veilUp || !artReady || framesDrawn < 3) return;
+  veilUp = false;
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+  boot.classList.add('done');
+  setTimeout(() => boot.classList.add('gone'), 500);
+}
+// Never leave it up on a slow or broken load — a spinner that never goes is
+// worse than a game missing some scenery; four seconds is the most black
+// screen anyone should be asked to sit through.
+setTimeout(() => { artReady = true; liftVeil(); }, 4000);
+
+window.__dbg = { player, streamer, obstacles, camera, roots, state: () => state, pipeline, scene, vistas, music, sfx };
 
 startLoop({
   step: (dt) => {
     const inp = input.sample();
 
-    if (state === STATE.READY && inp.anyPressed) { music.start(); restart(); return; }
+    // the first gesture is the only moment an AudioContext can be created
+    // unsuspended, so it has to happen here rather than at load
+    if (state === STATE.READY && inp.anyPressed) { music.start(); sfx.init(); restart(); return; }
     if (state === STATE.DEAD) {
       // Short lockout, or the death press instantly restarts and reads as a bug.
-      if (inp.anyPressed && performance.now() / 1000 - deadAt > 0.4) { music.setDuck(false); restart(); }
+      if (inp.anyPressed && performance.now() / 1000 - deadAt > 0.4) { music.setDuck(false); sfx.resume(); restart(); }
       return;
     }
     if (state !== STATE.RUNNING) return;
@@ -130,10 +209,12 @@ startLoop({
       if (overlaps(box, o)) {
         state = STATE.DEAD;
         deadAt = performance.now() / 1000;
+        sfx.play('crash');
         music.setDuck(true);          // pull the music back so the run-over screen lands
         if (player.distance > best) {
           best = player.distance;
           try { localStorage.setItem('ridgeline.best', String(best)); } catch (e) {}
+          showBest();
         }
         break;
       }
@@ -180,6 +261,7 @@ startLoop({
 
     hud.draw(state, player.distance, best, t);
     pipeline.render(scene, camera, hud.scene, hud.cam);
+    if (veilUp) { framesDrawn++; liftVeil(); }
 
     camera.position.x = cx; camera.position.y = cy;
   }

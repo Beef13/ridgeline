@@ -3,18 +3,147 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ridgeline</title>
+    <title>Ridge Run</title>
+    <meta name="description" content="An endless runner rendered through a 1994 output stage." />
+    <link rel="icon" href="./logo.png" />
     <style>
-      html, body { margin: 0; height: 100%; background: #07100c; overflow: hidden; }
+      :root {
+        --ground: #060e08;      /* the cabinet the screen sits in */
+        --score:  #ffd83d;
+        --faint:  #2f4436;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--ground); }
+      body {
+        color: var(--score);
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+      }
+
+      /* One column, screen in the middle taking whatever is left. The screen
+         gets `min-height: 0` because a flex child will not shrink below its
+         content otherwise, and the canvas would push the footer off-screen. */
+      .cabinet {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        /* Marquee and screen sit high; the score and byline stay pinned near
+           the bottom edge. The leftover collects BETWEEN them (see the auto
+           margin on #hiscore) rather than being split above and below, which
+           is what lifts the top of the page without moving the text. */
+        padding: clamp(6px, 1vh, 14px) 16px clamp(20px, 3.4vh, 40px);
+        justify-content: flex-start;
+      }
+
+      #logo {
+        display: block;
+        /* The screen scales in whole multiples of 256x224, so every pixel of
+           height spent on chrome can cost a whole step of game. Keep the logo
+           on a short leash and let the screen have the rest. */
+        width: min(41.8vw, 613px);
+        max-height: 13.1vh;
+        object-fit: contain;
+        flex: 0 0 auto;
+        /* Sits ON the screen, the way a cabinet's marquee overhangs the glass.
+           The negative margin also hands the space back to the stage, so the
+           screen keeps its size instead of paying for the overlap. */
+        margin-bottom: clamp(-23px, -1.9vh, -7.6px);
+        position: relative;
+        z-index: 2;
+        pointer-events: none;
+      }
+
       #stage {
-        position: fixed; inset: 0;
-        display: flex; align-items: center; justify-content: center;
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        display: flex;
+        /* Pinned to the top of its box, not centred: the overlap has to be the
+           margin above and nothing else, or leftover slack inside the stage
+           quietly eats it on one viewport and not another. */
+        align-items: flex-start;
+        justify-content: center;
       }
       canvas { display: block; image-rendering: pixelated; }
+
+      #hiscore {
+        margin: auto 0 0;          /* takes the slack, pinning itself low */
+        flex: 0 0 auto;
+        font-size: clamp(13px, 2.1vh, 22px);
+        letter-spacing: 0.06em;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--score);
+      }
+      #hiscore .m { font-size: 0.78em; }
+
+      footer {
+        margin: 6px 0 0;
+        flex: 0 0 auto;
+        font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 11px;
+        letter-spacing: 0.32em;
+        color: var(--faint);
+      }
+
+      /* Loading veil. Opaque black over everything until the art has landed —
+         the first seconds otherwise show a bare ridge with the scenery popping
+         in piece by piece, which reads as a broken page rather than a loading
+         one. */
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        background: #000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(24px, 5vh, 54px);
+        transition: opacity 420ms ease;
+      }
+      #boot img {
+        width: min(50vw, 460px);
+        max-height: 22vh;
+        object-fit: contain;
+      }
+      #boot .ring {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 216, 61, 0.18);
+        border-top-color: var(--score);
+        animation: spin 820ms linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      /* Faded out, then taken out of the layer entirely — a transparent
+         full-screen div still swallows every click and keypress. */
+      #boot.done { opacity: 0; pointer-events: none; }
+      #boot.gone { display: none; }
+      @media (prefers-reduced-motion: reduce) {
+        #boot .ring { animation-duration: 2.4s; }
+      }
+
+      /* On a phone the logo eats the screen the game needs. */
+      @media (max-aspect-ratio: 1/1) {
+        #logo { width: min(83.6vw, 613px); max-height: 13.1vh; margin-bottom: -1.33vh; }
+      }
     </style>
   </head>
   <body>
-    <div id="stage"></div>
+    <div id="boot">
+      <img src="./logo.png" alt="" />
+      <div class="ring" role="progressbar" aria-label="Loading"></div>
+    </div>
+
+    <div class="cabinet">
+      <img id="logo" src="./logo.png" alt="Ridge Run" />
+      <div id="stage"></div>
+      <p id="hiscore">HIGH SCORE: 0000<span class="m">m</span></p>
+      <footer>Beef13 &middot; 2026</footer>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

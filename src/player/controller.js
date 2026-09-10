@@ -26,6 +26,7 @@ export class Runner {
     this.speed = feel.startSpeed;
     this.distance = 0;
     this.dead = false;
+    this.wasDucking = false;
   }
 
   /** Hitbox in world space; ducking swaps it for a short wide one. */
@@ -49,6 +50,7 @@ export class Runner {
 
     if (this.buffer > 0) {
       if (this.coyote > 0) {
+        if (this.onAction) this.onAction('jump');
         this.vy = f.jumpVelocity;
         this.grounded = false;
         this.jumping = true;
@@ -57,6 +59,7 @@ export class Runner {
         this.buffer = 0;
         this.jumpsLeft = f.airJumps;
       } else if (this.jumpsLeft > 0) {
+        if (this.onAction) this.onAction('doubleJump');
         this.vy = f.doubleJumpVel;
         this.jumping = true;
         this.cutArmed = true;
@@ -70,6 +73,11 @@ export class Runner {
     // AFTER the jump, or the launch frame is both ducking and jumping and the
     // hitbox disagrees with the pose for exactly one frame.
     this.ducking = wantDuck && !this.jumping;
+    /* Reported HERE, where the duck actually resolves, not where the key was
+       read. Holding down through a crest re-evaluates every step, and a sound
+       fired off the raw input would stutter on every bump in the ground. */
+    if (this.ducking && !this.wasDucking && this.onAction) this.onAction('duck');
+    this.wasDucking = this.ducking;
 
     // Releasing early clips the arc ONCE, on the release edge. Applying it
     // every step compounds — at a 1/120 step the rise is crushed to nothing

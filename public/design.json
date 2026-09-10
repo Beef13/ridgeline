@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "saved": "2026-09-10 06:13",
+  "saved": "2026-09-10 07:12",
   "raster": {
     "w": 256,
     "h": 224,
@@ -23,7 +23,7 @@
   },
   "optics": {
     "fov": 14,
-    "vistaMaster": 0.32,
+    "vistaMaster": 0.02,
     "vistaHorizon": -3
   },
   "atmos": {
@@ -71,7 +71,7 @@
   "crt": {
     "on": true,
     "soft": 0.91,
-    "scan": 0.4,
+    "scan": 0.2,
     "mask": 0.22,
     "glow": 0.69,
     "curve": 0.245,
@@ -493,9 +493,9 @@
   ],
   "player": null,
   "game": {
-    "startSpeed": 7,
+    "startSpeed": 4.2,
     "maxSpeed": 17,
-    "speedRamp": 0.16,
+    "speedRamp": 0.09,
     "duckSpeedMul": 0.92,
     "standW": 0.62,
     "standH": 1.62,
