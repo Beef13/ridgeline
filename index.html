@@ -216,6 +216,22 @@
           top: var(--lift);
         }
         #m-music { display: block; position: relative; top: var(--lift); }
+
+        /* Added to the home screen, there is no address bar and no toolbar, so
+           the viewport is ~100px taller — and since the lift above is measured
+           in vh, while the screen only scales in whole multiples of 256x224,
+           the score drifts away from the game it belongs to. Standalone gets
+           its own arrangement instead of a fudged offset: the score and its
+           button sit right under the glass, the same 8px apart as they are
+           from each other, and ALL the leftover collects below them. */
+        @media (display-mode: standalone) {
+          #hiscore { margin: 8px 0 0; position: static; top: auto; }
+          #m-music { position: static; top: auto; }
+          footer { margin-top: auto; }
+          /* Nothing stands the page off the bottom edge here, so without this
+             the byline lands on the home indicator. Zero in Safari. */
+          .cabinet { padding-bottom: calc(clamp(20px, 3.4vh, 40px) + env(safe-area-inset-bottom, 0px)); }
+        }
       }
     </style>
   </head>
