@@ -31,6 +31,24 @@ jobs:
       # the live site — the build simply stops.
       - run: npm run test:logic
       - run: npm run build
+      # A missing asset does not fail a build — it 404s in the browser, quietly,
+      # and only on the published site. The logo shipped absent once because
+      # .gitignore was swallowing it; this makes that a red build instead.
+      - name: Check the build has its assets
+        run: |
+          for f in dist/logo.png dist/design.json dist/art/index.json \
+                   dist/audio/jump.mp3 dist/audio/duck.mp3 dist/audio/crash.mp3 \
+                   dist/audio/ethnic-flute-ambient.mp3; do
+            [ -s "$f" ] || { echo "::error::missing from the build: $f"; exit 1; }
+          done
+          node -e "
+            const a = require('./dist/art/index.json');
+            const d = require('./dist/design.json');
+            const want = [...new Set(d.assets.map(x => x.file))];
+            const missing = want.filter(w => !a.includes(w) && !a.some(f => f.startsWith(w)));
+            if (missing.length) { console.error('::error::art the design needs is not in the build: ' + missing.join(', ')); process.exit(1); }
+            console.log(want.length + ' art files all present');
+          "
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -4,6 +4,10 @@ dist/
 .DS_Store
 Thumbs.db
 
-# test screenshots
+# Test screenshots get dropped in the project root, so *.png is ignored — but
+# anything under public/ is a real asset the site cannot render without. The
+# logo was invisible on the published build for exactly this reason: it lived
+# in public/ but outside public/art/, so the one exception missed it.
 *.png
-!public/art/*.png
+!public/**/*.png
+!public/*.png
