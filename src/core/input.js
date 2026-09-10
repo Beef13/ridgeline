@@ -22,58 +22,61 @@ export class Input {
       if (JUMP.includes(e.code) || DUCK.includes(e.code)) this._anyLatch = true;
     });
     target.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
-    /* Touch: a short tap jumps, a longer press ducks.
+    /* Touch: where you put your finger decides, not how long you hold it.
      *
-     * The two gestures share a prefix — a press IS a tap until it has gone on
-     * too long — so neither can fire on contact. The jump waits for the lift
-     * and the duck waits for the clock. That is the cost of putting both
-     * actions on one target rather than on two halves of the screen, and it is
-     * why `touchHold` is a slider rather than a constant: it is the line
-     * between the two and it wants to be found by feel.
+     * Tap and hold share a prefix — a press IS a tap until it has gone on too
+     * long — so a scheme built on duration cannot act on contact: the jump has
+     * to wait for the lift and the duck for the clock. Position is known the
+     * instant the finger lands, so both actions fire immediately.
+     *
+     * The split is uneven on purpose. Jumping is far the more common action,
+     * so it gets the top two thirds and a mis-aimed tap still jumps; ducking
+     * is deliberate, and lives where a thumb naturally rests anyway.
      */
-    this._touchAt = 0;
     this._touchId = null;
-    this._holdTimer = 0;
     this.touchDuck = false;
-    this.touchHold = 0.13;                  // seconds; overwritten from feel
+    this.duckZone = 0.34;                  // bottom fraction of the screen
+
+    const zoneIsDuck = (e) => {
+      const el = document.querySelector('canvas');
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      // above or below the canvas counts as the nearer half, so the dead space
+      // around the screen on a tall phone is never an unresponsive strip
+      return (e.clientY - r.top) / r.height > 1 - this.duckZone;
+    };
 
     const down = (e) => {
-      if (this._touchId !== null) return;   // one finger decides; the rest are noise
-      this._touchId = e.pointerId;
-      this._touchAt = performance.now();
-      this._anyLatch = true;                // any contact starts or restarts a run
-      clearTimeout(this._holdTimer);
-      this._holdTimer = setTimeout(() => {
-        if (this._touchId !== null) this.touchDuck = true;
-      }, this.touchHold * 1000);
+      this._touchId = e.pointerId;         // the newest finger is the one that counts
+      this._anyLatch = true;
+      if (zoneIsDuck(e)) {
+        this.touchDuck = true;
+      } else {
+        this._jumpLatch = true;
+        /* A tap is over in an instant, so the finger is up before the jump
+           resolves. Variable jump height works by cutting the rise on RELEASE,
+           which would cut every touch jump to 45% on its own first frame — an
+           apex of 0.38 units, which clears nothing. A tapped jump is full. */
+        this._fullJump = true;
+      }
     };
     const up = (e) => {
       if (e.pointerId !== this._touchId) return;
       this._touchId = null;
-      clearTimeout(this._holdTimer);
-      const held = (performance.now() - this._touchAt) / 1000;
-      if (!this.touchDuck && held < this.touchHold) {
-        this._jumpLatch = true;
-        /* A tap is over before the jump fires, so the finger is already up.
-           Variable jump height works by cutting the rise on RELEASE — which
-           would cut every touch jump to 45% on its own first frame, an apex of
-           0.38 units that clears nothing. A tapped jump is a full one. */
-        this._fullJump = true;
-      }
       this.touchDuck = false;
     };
     target.addEventListener('pointerdown', down);
     target.addEventListener('pointerup', up);
-    // a finger dragged off the element, or a call arriving, never sends pointerup
+    // a finger dragged off the canvas, or a call arriving, never sends pointerup
     target.addEventListener('pointercancel', up);
     target.addEventListener('lostpointercapture', up);
+
     // A key held while the tab loses focus never sends keyup, and the player
     // comes back stuck in a duck.
     addEventListener('blur', () => {
       this.keys = Object.create(null);
       this._touchId = null;
       this.touchDuck = false;
-      clearTimeout(this._holdTimer);
     });
   }
 

@@ -41,7 +41,6 @@ export const feel = {
   camLerpY:      5,
 
   // --- touch ---
-  // Below this, a press is a tap and jumps; above it, a duck. Both actions
-  // pay for it: the jump waits for the lift, the duck waits for the clock.
-  touchHold:     0.13
+  // How much of the bottom of the screen ducks. The rest jumps, on contact.
+  duckZone:      0.34
 };
