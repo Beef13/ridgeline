@@ -6,6 +6,10 @@
  * Get that wrong and the ridge silently reshuffles itself as you run along it,
  * or drops instances at every seam.
  */
+/* Size lives in the mesh's SCALE, not in the geometry: every instance shares
+   one unit quad, so `geometry.parameters` is 1x1 for all of them and tells you
+   nothing. These assertions measure the size as drawn, which is what matters
+   and which stays true however the size is expressed. */
 import * as THREE from 'three';
 import { ScatterArt, SCATTER_DEFAULT } from '../src/world/scatterart.js';
 import { heightAt } from '../src/world/terrain.js';
@@ -73,7 +77,7 @@ const xs = (grp) => grp.children.map((c) => +c.position.x.toFixed(6)).sort((a, b
   const s = make();
   const g = s.chunk(0, 160);
   const worst = Math.max(...g.children.map((c) => {
-    const foot = c.position.y - c.geometry.parameters.height * 0.5 - CFG.yOff;
+    const foot = c.position.y - c.scale.y * 0.5 - CFG.yOff;
     return Math.abs(foot - heightAt(c.position.x));
   }));
   check('every instance sits on the terrain', worst < 1e-6, `worst gap ${worst.toExponential(1)}u`);
@@ -82,7 +86,7 @@ const xs = (grp) => grp.children.map((c) => +c.position.x.toFixed(6)).sort((a, b
 // sizes stay inside the range asked for, and vary within it
 {
   const s = make();
-  const hs = s.chunk(0, 200).children.map((c) => c.geometry.parameters.height);
+  const hs = s.chunk(0, 200).children.map((c) => c.scale.y);
   const lo = Math.min(...hs), hi = Math.max(...hs);
   check('sizes stay in range', lo >= CFG.sMin - 1e-9 && hi <= CFG.sMax + 1e-9, `${lo.toFixed(2)}–${hi.toFixed(2)}u`);
   check('and actually vary', hi - lo > (CFG.sMax - CFG.sMin) * 0.5, `spread ${(hi - lo).toFixed(2)}u`);
@@ -102,7 +106,7 @@ const xs = (grp) => grp.children.map((c) => +c.position.x.toFixed(6)).sort((a, b
   const s = make();
   const m = s.chunk(0, 32).children[0];
   check('plane takes the image aspect',
-    Math.abs(m.geometry.parameters.width / m.geometry.parameters.height - 1.2) < 1e-9);
+    Math.abs(Math.abs(m.scale.x) / m.scale.y - 1.2) < 1e-9);
 }
 
 // zero density is off, not a crash
@@ -135,7 +139,7 @@ const xs = (grp) => grp.children.map((c) => +c.position.x.toFixed(6)).sort((a, b
 // off the play plane there is no terrain, so a height band is the only sensible rule
 {
   const s = make({ mode: 'free', yMin: -6, yMax: -2 }, 2);
-  const feet = s.chunk(0, 100, 2).children.map((c) => c.position.y - c.geometry.parameters.height / 2);
+  const feet = s.chunk(0, 100, 2).children.map((c) => c.position.y - c.scale.y / 2);
   check('free mode sits in the band asked for',
     Math.min(...feet) >= -6.001 && Math.max(...feet) <= -1.999,
     `${Math.min(...feet).toFixed(2)}..${Math.max(...feet).toFixed(2)}`);
@@ -147,7 +151,7 @@ const xs = (grp) => grp.children.map((c) => +c.position.x.toFixed(6)).sort((a, b
 // glue distant art to a surface that is not under it
 {
   const s = make({ mode: 'ground', yOff: 0 }, 4);
-  const feet = s.chunk(0, 100, 4).children.map((c) => c.position.y - c.geometry.parameters.height / 2);
+  const feet = s.chunk(0, 100, 4).children.map((c) => c.position.y - c.scale.y / 2);
   check('ground mode off the play plane falls back to the band',
     feet.every((f) => Math.abs(f - heightAt(0)) > 1e-6 || CFG.yMin === CFG.yMax));
 }
@@ -181,7 +185,7 @@ const xs = (grp) => grp.children.map((c) => +c.position.x.toFixed(6)).sort((a, b
     Math.min(...zs) >= -130 - 3 - 1e-9 && Math.max(...zs) <= -130 - 0.5 + 1e-9,
     `${Math.min(...zs).toFixed(2)}..${Math.max(...zs).toFixed(2)} around -130`);
   check('and spread rather than pinned to one plane', Math.max(...zs) - Math.min(...zs) > 2);
-  const feet = kids.map((c) => c.position.y - c.geometry.parameters.height / 2);
+  const feet = kids.map((c) => c.position.y - c.scale.y / 2);
   check('in the height band asked for',
     Math.min(...feet) >= 0.999 && Math.max(...feet) <= 5.001,
     `${Math.min(...feet).toFixed(2)}..${Math.max(...feet).toFixed(2)}`);

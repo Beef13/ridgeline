@@ -87,8 +87,14 @@ export class Pipeline {
    * A real CRT throws its picture onto the wall behind it, so the glow has to
    * follow what is on screen — a fixed colour reads as a sticker, not as light.
    * The frame's average is taken by drawing the canvas into a 1x1 context,
-   * which makes the BROWSER do the box filter on the GPU; reading the pixels
-   * back out of WebGL ourselves would stall the pipeline every time.
+   * which makes the BROWSER do the box filter rather than doing it by hand.
+   *
+   * The catch is getImageData: it cannot return until the GPU has actually
+   * produced the pixels, so called straight after rendering it blocks on work
+   * that has only just been submitted. Measured at 78ms per sample. Called at
+   * the START of the next frame instead, the same read costs nothing, because
+   * by then the frame it is asking about is long finished. The colour is one
+   * frame stale, which is invisible on something already eased at 0.22.
    *
    * Sampled every sixth frame and eased toward, not snapped. At full rate it
    * costs more than it is worth, and a hard cut makes the wall flicker on

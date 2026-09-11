@@ -313,9 +313,12 @@ startLoop({
     sky.scale.set(sh * camera.aspect, sh, 1);
     vistas.update(cx, cy, camera.position.z, halfTan, camera.aspect, snap);
 
+    /* Before the render, not after: this reads back the PREVIOUS frame, which
+       the GPU finished long ago, so it never waits. Sampling it straight after
+       drawing blocks on work that was just submitted — 78ms a time. */
+    pipeline.sampleGlow();
     hud.draw(state, player.distance, best, t);
     pipeline.render(scene, camera, hud.scene, hud.cam);
-    pipeline.sampleGlow();   // must be inside the frame, while the buffer still holds it
     if (veilUp) { framesDrawn++; liftVeil(); }
 
     camera.position.x = cx; camera.position.y = cy;

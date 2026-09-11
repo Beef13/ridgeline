@@ -34,6 +34,15 @@ export const SCATTER_DEFAULT = {
 
 const DEG = Math.PI / 180;
 
+/* One plane, shared by every scattered instance.
+ *
+ * Each instance used to build its own PlaneGeometry just to bake its size into
+ * the vertices — 2,200-odd geometries, each with its own buffers, its own
+ * upload and its own bounding sphere, to describe two triangles that differ
+ * only by a scale factor. A unit quad scaled by the mesh is the same four
+ * vertices in the same places, and there is exactly one of it. */
+const UNIT = new THREE.PlaneGeometry(1, 1);
+
 const hash = (n) => { const a = Math.sin(n * 43758.5453) * 12345.6789; return a - Math.floor(a); };
 
 export class ScatterArt {
@@ -109,10 +118,16 @@ export class ScatterArt {
         const foot = (k.cfg.mode === 'ground' && layer === 1)
           ? heightAt(x) + k.cfg.yOff
           : k.cfg.yMin + r(5) * (k.cfg.yMax - k.cfg.yMin);
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(s * k.aspect, s), k.material);
+        const m = new THREE.Mesh(UNIT, k.material);
         m.position.set(x, foot + s * 0.5, z);
-        if (k.cfg.flip && r(4) > 0.5) m.scale.x = -1;
+        m.scale.set(s * k.aspect * (k.cfg.flip && r(4) > 0.5 ? -1 : 1), s, 1);
         if (k.cfg.rot) m.rotation.z = (r(6) - 0.5) * 2 * k.cfg.rot * DEG;
+        /* Nothing moves an instance once it is placed — the GROUP is what
+           streams — so the local matrix is composed once here instead of being
+           rebuilt from position/quaternion/scale on all 2,200 of them, every
+           frame, forever. */
+        m.matrixAutoUpdate = false;
+        m.updateMatrix();
         m.userData.scattered = k.spec.file;
         g.add(m);
       }
@@ -153,12 +168,14 @@ export class ScatterArt {
         const r = (j) => hash(k.seed + n * 7.13 + j * 131.7);
         const x = (n + r(1) * 0.85) * step;
         const s = k.cfg.sMin + r(2) * Math.max(0, k.cfg.sMax - k.cfg.sMin);
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(s * k.aspect, s), k.material);
+        const m = new THREE.Mesh(UNIT, k.material);
         // spread in depth around the band's distance, same rule as a world layer
         const z = -k.cfg.depth + k.cfg.z0 + r(3) * (k.cfg.z1 - k.cfg.z0);
         m.position.set(x, k.cfg.yMin + r(5) * (k.cfg.yMax - k.cfg.yMin) + s * 0.5, z);
-        if (k.cfg.flip && r(4) > 0.5) m.scale.x = -1;
+        m.scale.set(s * k.aspect * (k.cfg.flip && r(4) > 0.5 ? -1 : 1), s, 1);
         if (k.cfg.rot) m.rotation.z = (r(6) - 0.5) * 2 * k.cfg.rot * DEG;
+        m.matrixAutoUpdate = false;
+        m.updateMatrix();
         m.userData.scattered = k.spec.file;
         g.add(m);
       }
