@@ -14,9 +14,7 @@ export function makeFigure() {
   const body = new THREE.Group();
   const torso = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 11), fur);
   torso.scale.set(1.18, 1.02, 0.88);
-  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.30, 12, 9), skin);
-  chest.scale.set(1.0, 0.9, 0.55); chest.position.set(0.10, -0.02, 0.30);
-  body.add(torso, chest);
+  body.add(torso);
   body.position.y = 0.92;
   g.add(body);
 
