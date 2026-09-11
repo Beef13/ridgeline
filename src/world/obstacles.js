@@ -622,9 +622,15 @@ export class ObstacleField {
   animate(t) {
     for (const it of this.items) {
       if (!it.kind.flying) continue;
-      // beat harder on the climb: it is the tell that the bird is going up
+      /* Beat DEEPER on the climb, never faster.
+         The rate used to ride on the climb too (11 +- 5 rad/s), which read as
+         two different birds: a roaming one looked panicked next to a hovering
+         one holding a steady beat. Worse, a frequency that changes over time
+         drags the phase with it, so the wings also jumped position whenever
+         the climb turned over. Amplitude alone still says "going up" and
+         leaves every vulture on the same clock. */
       const climb = it.box.roam ? Math.cos(this.time * it.box.rate + it.phase) : 0;
-      const flap = Math.sin(t * (11 + climb * 5) + it.phase);
+      const flap = Math.sin(t * 11 + it.phase);
       const [wl, wr] = it.group.userData.wings;
       wl.rotation.x = flap * (0.7 + climb * 0.25);
       wr.rotation.x = -flap * (0.7 + climb * 0.25);

@@ -117,6 +117,55 @@ for (const [name, kind] of Object.entries(KINDS)) {
 function HIGH_BLOCKS(standH) { return standH > 0.70 && standH < 1.72 + 0.62; }
 
 /* ---------------------------------------------------------------------------
+ * Flap RATE is the same for every bird.
+ *
+ * The climb used to drive the frequency as well as the depth of the beat, so a
+ * roaming vulture flapped between 6 and 16 rad/s while a hovering one held a
+ * steady 11 — they read as two different creatures, and the faster one looked
+ * panicked. Counting zero crossings is the honest measure: two birds given the
+ * same starting phase must cross the same number of times over the same window,
+ * whatever either one is doing with its altitude.
+ */
+{
+  const field = new ObstacleField(new THREE.Group());
+  const add = (roam) => {
+    let b;
+    for (;;) { b = KINDS.raptor.box(roam ? 3000 : 0); if (!!b.roam === roam) break; }
+    const g = KINDS.raptor.build(b);
+    field.root.add(g);
+    const it = { name: 'raptor', kind: KINDS.raptor, box: b, group: g,
+                 x: 0, gy: 0, phase: 0.4, yOff: b.yOff, beats: 0, prev: undefined };
+    field.items.push(it);
+    return it;
+  };
+  const roamer = add(true), hoverer = add(false);
+  for (let s = 0; s < 900; s++) {
+    field.time = s / 60;                       // animate() reads this for the climb
+    field.animate(s / 60);
+    for (const it of [roamer, hoverer]) {
+      const a = it.group.userData.wings[0].rotation.x;
+      if (it.prev !== undefined && (it.prev <= 0) !== (a <= 0)) it.beats++;
+      it.prev = a;
+    }
+  }
+  check('bird: a roaming bird flaps at the same rate as a hovering one',
+    roamer.beats === hoverer.beats && roamer.beats > 20,
+    `${roamer.beats} vs ${hoverer.beats} half-beats in 15s`);
+
+  /* The climb still has to SHOW, or the change threw away the cue rather than
+     fixing it. Depth of beat is what carries it now. */
+  let lo = 1e9, hi = -1e9;
+  for (let s = 0; s < 900; s++) {
+    field.time = s / 60;
+    field.animate(s / 60);
+    const a = Math.abs(roamer.group.userData.wings[0].rotation.x);
+    lo = Math.min(lo, a); hi = Math.max(hi, a);
+  }
+  check('and the climb still shows in how DEEP the beat is',
+    hi > 0.90 && hi - lo > 0.30, `${lo.toFixed(2)}..${hi.toFixed(2)} rad`);
+}
+
+/* ---------------------------------------------------------------------------
  * The bird's silhouette.
  *
  * A flyer is the one obstacle whose job is to be IDENTIFIED before it is
