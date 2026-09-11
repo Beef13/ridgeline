@@ -37,6 +37,32 @@ export class Runner {
     return { x0: this.x - w / 2, x1: this.x + w / 2, y0: this.y, y1: this.y + h };
   }
 
+  /**
+   * Bounce off something you landed on.
+   *
+   * One height, always. There WAS a bigger launch for pressing jump on
+   * contact, and it worked — it just sent the runner high enough to see over
+   * the top of the scene, which is not a tuning problem: the world is only
+   * built as far up as the camera was ever meant to look. Parked rather than
+   * solved. To bring it back, take a `big` flag here and a `stompJump` in
+   * tuning, and pass `player.buffer > 0` at the call site in main.js — but the
+   * vista and the sky have to reach higher first.
+   *
+   * The variable-height cut is DISARMED. Left armed, a bounce the player did
+   * not ask for gets halved the instant they are not holding jump, so the
+   * landing would fizzle exactly when it needed to clear the bird.
+   */
+  bounce() {
+    const f = feel;
+    this.vy = f.stompBounce;
+    this.grounded = false;
+    this.jumping = true;
+    this.cutArmed = false;
+    this.buffer = 0;                 // spent: it must not also fire a double jump
+    this.jumpsLeft = f.airJumps;     // the bird is gone, so the save is earned again
+    if (this.onAction) this.onAction('jump');
+  }
+
   step(dt, input, running) {
     const f = feel;
     if (!running) return;

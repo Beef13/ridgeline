@@ -412,5 +412,86 @@ function HIGH_BLOCKS(standH) { return standH > 0.70 && standH < 1.72 + 0.62; }
     thinnest > PX, `thinnest half ${(thinnest / PX).toFixed(2)}px`);
 }
 
+/* ---------------------------------------------------------------------------
+ * Stomping a bird.
+ *
+ * The feature is two outcomes from one contact, and the risk in it is that the
+ * generous half leaks: if landing loosely on a bird counts, then running
+ * chest-first into a low one counts too, and the hardest obstacle in the game
+ * becomes the safest. So the tests care less about the bounce working than
+ * about the cases that must STILL kill.
+ */
+{
+  const { feel } = await import('../src/player/tuning.js');
+  const obs = await import('../src/world/obstacles.js');
+  const field = new obs.ObstacleField(new THREE.Group());
+  const put = () => {
+    let b;
+    for (;;) { b = obs.KINDS.raptor.box(0); if (!b.roam) break; }
+    const g = obs.KINDS.raptor.build(b);
+    field.root.add(g);
+    const it = { name: 'raptor', kind: obs.KINDS.raptor, box: b, group: g,
+                 x: 0, gy: 0, phase: 0, yOff: b.yOff, id: field.nextId++, stomped: -1 };
+    field.items.push(it);
+    return it;
+  };
+  const bird = put();
+  const o = field.boxes()[0];
+  const h = o.y1 - o.y0;
+
+  // the same test the game runs, lifted out so both halves are judged alike
+  const isStomp = (feetY, vy) =>
+    vy < 0 && feetY >= o.y0 + h * feel.stompTop;
+
+  check('bird: landing on top counts as a stomp', isStomp(o.y1 - 0.01, -8));
+  check('and running into its middle does NOT', !isStomp(o.y0 + h * 0.3, -8),
+    `feet at ${(0.3 * 100).toFixed(0)}% of the bird`);
+  check('and rising into its belly does NOT', !isStomp(o.y1, 4),
+    'moving up, however high the feet are');
+
+  check('stomping it takes it out of collision', field.stomp(bird.id) && field.boxes().length === 0);
+  check('and it cannot be stomped twice', field.stomp(bird.id) === false);
+
+  /* The anguish, and the fall. Both have to actually happen — a bird that is
+     merely deleted is a bug report about vanishing obstacles. */
+  const startY = bird.yOff;
+  let arched = 0, spun = 0;
+  for (let s = 0; s < 240; s++) {
+    field.update({ x: 0, speed: 7, distance: 0 }, false, 1 / 60);
+    field.animate(field.time);
+    if (bird.group.userData.neck) arched = Math.max(arched, bird.group.userData.neck.rotation.z);
+    spun = Math.max(spun, Math.abs(bird.group.rotation.z));
+  }
+  check('and its neck arches back', arched > 1.0, `${arched.toFixed(2)} rad`);
+  check('and it tumbles', spun > 1.0, `${spun.toFixed(2)} rad`);
+  check('and it falls off the bottom of the screen', bird.yOff < startY - 10,
+    `${startY.toFixed(2)} -> ${bird.yOff.toFixed(2)}`);
+  check('and is cleaned up once it is gone', field.items.length === 0);
+
+  /* One height, and it must stay under a normal jump.
+     The bigger timed launch was removed because it carried the runner above
+     the built part of the scene, so the ceiling is the thing to guard: a
+     bounce that beats jumpVelocity puts the camera somewhere the world was
+     never modelled for, and the failure looks like missing art rather than
+     like a physics number. Held against the apex, not the velocity, because
+     that is what the camera actually follows. */
+  const { Runner } = await import('../src/player/controller.js');
+  const p1 = new Runner(); p1.bounce();
+  const p2 = new Runner(); p2.buffer = 1; p2.bounce();
+  check('a bounce is smaller than a normal jump', p1.vy < feel.jumpVelocity,
+    `${p1.vy} vs ${feel.jumpVelocity}`);
+  check('and holding jump does not make it bigger', p1.vy === p2.vy,
+    `${p1.vy} vs ${p2.vy}`);
+  const apex = (v) => (v * v) / (2 * Math.abs(feel.gravity));
+  check('so a stomp never throws the runner above a normal jump',
+    apex(p1.vy) < apex(feel.jumpVelocity),
+    `${apex(p1.vy).toFixed(2)}u vs ${apex(feel.jumpVelocity).toFixed(2)}u`);
+  /* The bounce must survive not holding the button. The variable-height cut
+     halves any rise the frame it sees jump released, which would gut a passive
+     bounce the player never pressed for. */
+  check('and a bounce is immune to the jump cut', p1.cutArmed === false);
+  check('and it hands back the air jump', p1.jumpsLeft === feel.airJumps);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

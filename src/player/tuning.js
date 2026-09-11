@@ -19,6 +19,13 @@ export const feel = {
   duckDrop:    -26,       // holding down in the air slams you back to the ground
   airJumps:      1,       // extra jumps after leaving the ground
 
+  /* Landing on a bird. One height, whatever the player does with the button:
+     enough to clear the bird and keep going, deliberately less than a jump
+     from flat ground. A bigger launch for a timed press is parked — it read
+     well but carried the runner above the built part of the scene. */
+  stompBounce:   7.6,     // enough to clear the bird, not much more
+  stompTop:      0.45,    // how far up the bird your feet must be to count as a stomp
+
   // --- forgiveness (invisible when right, infuriating when missing) ---
   coyoteTime:    0.09,
   jumpBuffer:    0.12,

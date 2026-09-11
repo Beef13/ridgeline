@@ -15,6 +15,39 @@ const TOUCH = typeof matchMedia === 'function' &&
 const BRIGHT = '#ffd23a';
 const DIM    = '#9a7a24';
 
+/* The distance milestone that flashes with the bell.
+ *
+ * Size carries it, not colour. The number has to register in peripheral vision
+ * while the player's eyes are on the ridge ahead, and the loud way to do that —
+ * a bright colour in the middle of the frame — pulls the eyes off the thing
+ * they are supposed to be watching and gets you killed. So it is drawn at the
+ * dim tone the high score already uses, and made large instead: a 30px glyph on
+ * a 224px-tall buffer is read by the edge of the retina, which is poor at
+ * colour and good at size and movement.
+ *
+ * It holds rather than blinks. A blink is read as an alert — it demands a
+ * glance to find out what it wants — and this is not one; it is a number the
+ * player already knows is coming. Held steady it can be taken in with a flick
+ * of attention and ignored, which is the whole point of putting it out of the
+ * way in the top third. */
+export const MILESTONE = {
+  hold:   3.0,      // seconds it stays on screen, solid
+  size:   30,
+  /* Semi-transparent, and the SHADOW fades with it. The HUD draws every glyph
+     twice — a hard black offset, then the fill — so fading only the fill would
+     leave a solid black number with a pale ghost sitting on it. Setting the
+     alpha on the context instead takes both, which is what "semi transparent
+     text" actually means here. */
+  alpha:  0.55,
+  colour: '#ffffff'
+};
+
+/** Is the milestone showing `e` seconds in, and is it finished? */
+export function milestoneOn(e) {
+  const done = e >= MILESTONE.hold;
+  return { show: e >= 0 && !done, done };
+}
+
 export class Hud {
   constructor(w, h) {
     this.w = w; this.h = h;
@@ -33,6 +66,19 @@ export class Hud {
       new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthTest: false })
     ));
     this.blink = 0;
+    this.flashText = null;
+    this.flashStart = -1;
+  }
+
+  /**
+   * Announce a distance milestone. Timed from the first frame that DRAWS it
+   * rather than from the moment it was called, so the three flashes are always
+   * three flashes — a milestone raised during a long frame would otherwise
+   * have part of its first blink already behind it.
+   */
+  flash(label) {
+    this.flashText = label;
+    this.flashStart = -1;
   }
 
   resize(w, h) {
@@ -106,11 +152,32 @@ export class Hud {
     const c = this.ctx;
     c.clearRect(0, 0, this.w, this.h);
 
-    /* Two shades, one job each: what you are doing now is bright, what you
-       have to beat sits under it dimmer. Same hue, so they read as one block
-       rather than two unrelated numbers. */
-    this.text(String(Math.floor(score)) + 'M', this.w - 5, 5, BRIGHT, 'right', 13);
-    this.text('HI ' + String(Math.floor(best)) + 'M', this.w - 5, 20, DIM, 'right', 9);
+    /* Distance only. The high score used to sit under it, and it was the wrong
+       thing to carry inside the frame: it never changes during a run, so it is
+       nine pixels of screen spent on a number the player cannot affect until
+       they are dead. It lives on the cabinet outside the screen now, which is
+       where an arcade machine put it anyway.
+
+       Lower-case m, because at 13px a capital M is nearly as wide as a digit
+       and the eye reads "100M" as five characters rather than a number with a
+       unit on it. */
+    this.text(String(Math.floor(score)) + 'm', this.w - 5, 5, BRIGHT, 'right', 13);
+
+    /* Centred in the top third — clear of the runner and of the ridge line the
+       player is reading, and clear of the score in the corner. Dropped the
+       instant the run ends, so it can never sit under the OUCH screen. */
+    if (this.flashText && state !== 'running') this.flashText = null;
+    if (this.flashText) {
+      if (this.flashStart < 0) this.flashStart = t;
+      const { show, done } = milestoneOn(t - this.flashStart);
+      if (done) this.flashText = null;
+      else if (show) {
+        c.globalAlpha = MILESTONE.alpha;
+        this.text(this.flashText, Math.round(this.w / 2),
+          Math.round(this.h / 6 - MILESTONE.size / 2), MILESTONE.colour, 'center', MILESTONE.size);
+        c.globalAlpha = 1;
+      }
+    }
 
     if (state === 'ready') {
       /* Whole pixels only. The buffer is 256 across, so a fractional offset

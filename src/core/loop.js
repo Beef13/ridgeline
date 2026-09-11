@@ -3,7 +3,15 @@
  * framerate or the jump height changes on a faster monitor.
  */
 export function startLoop({ fixed = 1 / 120, maxFrame = 0.1, step, render, maxFps = 60 }) {
-  let last = performance.now(), acc = 0, lastDraw = 0;
+  /* `last` is set by the FIRST frame, not here.
+     Seeding it from the clock at startup charges the simulation for however
+     long the browser took to deliver that first frame — a gap that is real
+     time but not GAME time, and one that varies with load, so the same run
+     starts a few steps ahead or behind for no reason the player caused. It is
+     clamped by maxFrame so it was never catastrophic, just silently
+     non-deterministic, which is worse to debug. A frame with no predecessor
+     has no delta. */
+  let last = 0, acc = 0, lastDraw = 0;
 
   /* A 120Hz laptop offers twice as many frames as this game has anything new
      to show, and every one costs the full scene, the palette pass and the tube
@@ -24,6 +32,7 @@ export function startLoop({ fixed = 1 / 120, maxFrame = 0.1, step, render, maxFp
 
   function frame(now) {
     requestAnimationFrame(frame);
+    if (!last) last = now;                 // first frame: no delta, nothing to step
     const raw = now - last;
     const dt = Math.min(maxFrame, raw / 1000);
     last = now;

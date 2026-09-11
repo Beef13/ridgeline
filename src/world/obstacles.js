@@ -126,6 +126,19 @@ export const NECK_RISE = 0.36;
    to be at zero. */
 export const WING_ROOT = [-0.13, 0.03, 0];
 
+/* Where the neck hinges, in the bird's own space — the back end of the first
+   neck segment, which is where it actually leaves the shoulders. Everything
+   from here forward (neck, head, eye, brow, beak) hangs off this pivot so a
+   stomped bird can throw its head back in one rotation. Same lesson as
+   WING_ROOT: a pivot at the origin swings the head around the belly. */
+export const NECK_PIVOT = [0.02, 0.07, 0];
+
+/* How far back the neck is thrown when the bird is stomped, in radians.
+   The head sits forward of the pivot, so a POSITIVE z rotation lifts it up and
+   back — the arch of something recoiling, not a nod. Deliberately past
+   vertical: at 29 pixels across, a subtle flinch is no flinch at all. */
+export const STOMP_ARCH = 1.15;
+
 export const WING_FEATHERS = [
   [0.34, 0.086, 0.21, -0.02, 0.000, 0.20],
   [0.27, 0.082, 0.17, -0.07, 0.005, 0.38],
@@ -423,6 +436,23 @@ export const KINDS = {
         g.add(mesh);
         return mesh;
       };
+      /* Everything from the shoulders forward hangs off its own pivot, so the
+         whole head-and-neck assembly can be thrown back in one rotation when
+         the bird is stomped. The pivot sits where the neck LEAVES the
+         shoulders — put it at the origin instead and the head swings round the
+         belly, which reads as the head detaching rather than the neck arching.
+         Parts are authored in the bird's own coordinates as before and shifted
+         into the pivot's space here, so the numbers above stay comparable. */
+      const neck = new THREE.Group();
+      neck.position.set(NECK_PIVOT[0], NECK_PIVOT[1], NECK_PIVOT[2]);
+      g.add(neck);
+      g.userData.neck = neck;
+      const addNeck = (mesh, x, y, z, rz = 0) => {
+        mesh.position.set(x - NECK_PIVOT[0], y - NECK_PIVOT[1], z - NECK_PIVOT[2]);
+        if (rz) mesh.rotation.z = rz;
+        neck.add(mesh);
+        return mesh;
+      };
       const ball = (r, mat, sx, sy, sz) => {
         const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), mat);
         m.scale.set(sx, sy, sz);
@@ -451,8 +481,8 @@ export const KINDS = {
          for impact. A vulture's neck leaves the shoulders and goes UP. */
       // the same yellow as the feet — a bare neck and bare legs are the same
       // skin on a real vulture, and matching them ties the two ends together
-      add(slab(0.135, 0.105, 0.105, M.skin), 0.090, 0.104, 0, NECK_RISE + 0.04);
-      add(slab(0.125, 0.095, 0.095, M.skin), 0.165, 0.132, 0, NECK_RISE - 0.04);
+      addNeck(slab(0.135, 0.105, 0.105, M.skin), 0.090, 0.104, 0, NECK_RISE + 0.04);
+      addNeck(slab(0.125, 0.095, 0.095, M.skin), 0.165, 0.132, 0, NECK_RISE - 0.04);
       // tail, tipped up and cut square — a ragged back end reads at distance
       // where a tapered one turns to mush
       add(slab(0.23, 0.12, 0.17, M.bird), -0.33, 0.02, 0, 0.30);
@@ -460,7 +490,7 @@ export const KINDS = {
       // a smaller head, held further forward: the proportions of a vulture are
       // a big beak and a small skull, which is lucky, because the beak is what
       // survives at this size
-      add(ball(0.115, M.skin, 1.1, 1.05, 1.0), 0.245, 0.162, 0);
+      addNeck(ball(0.115, M.skin, 1.1, 1.05, 1.0), 0.245, 0.162, 0);
       /* A bare black dot on the yellow head, set proud of it so it survives
          being seen edge-on. No white around it: on a head this size the white
          was most of the eye and the dot was a speck inside it, which read as a
@@ -470,18 +500,18 @@ export const KINDS = {
          It still has to clear a screen pixel. Anything smaller is not a small
          eye, it is an intermittent one — present or absent depending on where
          the sampling grid falls that frame. */
-      for (const sd of [1, -1]) add(ball(0.023, M.pupil, 1, 1, 0.9), 0.280, 0.186, sd * 0.106);
+      for (const sd of [1, -1]) addNeck(ball(0.023, M.pupil, 1, 1, 0.9), 0.280, 0.186, sd * 0.106);
       /* Brow. Two pixels of it, and worth every one: an angled bar over the eye
          is the difference between a bird and an angry bird, and the top edge of
          the head is part of the outline. */
-      add(slab(0.15, 0.065, 0.13, M.birdL), 0.255, 0.246, 0, -0.32);
+      addNeck(slab(0.15, 0.065, 0.13, M.birdL), 0.255, 0.246, 0, -0.32);
       /* The beak stops short of the hitbox edge on purpose. Art that reaches
          outside the box kills from somewhere it visibly is not, and a beak is
          exactly the part a player judges the gap by. */
       // the beak, in two parts — a straight upper and a hook. One tapered cone
       // would vanish; the step between the two is what the eye catches.
-      add(slab(0.21, 0.095, 0.105, M.beak), 0.345, 0.132, 0, 0.10);
-      add(slab(0.08, 0.13, 0.095, M.beakTip), 0.418, 0.052, 0, 0.16);
+      addNeck(slab(0.21, 0.095, 0.105, M.beak), 0.345, 0.132, 0, 0.10);
+      addNeck(slab(0.08, 0.13, 0.095, M.beakTip), 0.418, 0.052, 0, 0.16);
 
       // talons, trailing under the body: the lowest thing on the bird and the
       // first thing a player sees when it passes overhead
@@ -556,6 +586,7 @@ export class ObstacleField {
     this.nextX = 26;          // first obstacle is far enough to read the scene
     this.lastKind = null;
     this.time = 0;            // the field's own clock, so flight is not tied to frame rate
+    this.nextId = 1;          // stable handle for "that one", since items shuffle
   }
 
   reset() {
@@ -598,7 +629,8 @@ export class ObstacleField {
         g.position.set(this.nextX, gy, 0);
         this.root.add(g);
         const it = { name, kind, box: b, group: g, x: this.nextX, gy,
-                     phase: Math.random() * 6.28, yOff: b.yOff };
+                     phase: Math.random() * 6.28, yOff: b.yOff, id: this.nextId++,
+                     stomped: -1 };
         this.items.push(it);
         this.nextX += this.gapFor(player.speed, player.distance) + b.w;
       }
@@ -608,20 +640,70 @@ export class ObstacleField {
        which runs after. A flyer resolved on the render side would be judged
        against where it was a frame ago. */
     for (const it of this.items) {
-      if (it.kind.flying) it.yOff = flyerYOff(it, this.time);
+      if (!it.kind.flying) continue;
+      /* A stomped bird stops flying and starts FALLING. It keeps its yOff — the
+         same number the art reads — so nothing needs a second position to go
+         stale against, and it simply drops out of the bottom of the frame. */
+      if (it.stomped >= 0) {
+        it.stomped += dt;
+        it.fallV += feel.fallGravity * dt;
+        it.yOff += it.fallV * dt;
+      } else {
+        it.yOff = flyerYOff(it, this.time);
+      }
     }
     // Cull well behind, so nothing pops out while still on screen.
     for (let i = this.items.length - 1; i >= 0; i--) {
-      if (this.items[i].x < player.x - 30) {
+      const fallen = this.items[i].stomped >= 0 && this.items[i].gy + this.items[i].yOff < -14;
+      if (this.items[i].x < player.x - 30 || fallen) {
         this.root.remove(this.items[i].group);
         this.items.splice(i, 1);
       }
     }
   }
 
+  /**
+   * Land on a bird and it is finished: it stops being a hazard on the same
+   * frame, arches its neck back, and falls.
+   *
+   * Returns false if that one is already falling. The caller needs to know,
+   * because a player straddling two overlapping boxes must not get two bounces
+   * out of one landing.
+   */
+  stomp(id) {
+    const it = this.items.find((i) => i.id === id);
+    if (!it || !it.kind.flying || it.stomped >= 0) return false;
+    it.stomped = 0;
+    /* A small upward kick before gravity takes it, so the bird is knocked off
+       its line rather than simply switched off. Under fallGravity it is back
+       past its starting height in under a fifth of a second. */
+    it.fallV = 2.4;
+    it.spin = (rnd() < 0.5 ? -1 : 1) * (1.8 + rnd() * 1.2);
+    return true;
+  }
+
   animate(t) {
     for (const it of this.items) {
       if (!it.kind.flying) continue;
+      if (it.stomped >= 0) {
+        /* Anguish, in the only two channels that read at 29 pixels across:
+           the neck thrown back, and the whole bird tumbling. The arch snaps on
+           fast — it is the moment of impact, not a slump — while the tumble
+           builds, so the first thing the eye catches is the head going back. */
+        const arch = Math.min(1, it.stomped / 0.09);
+        const neck = it.group.userData.neck;
+        if (neck) neck.rotation.z = STOMP_ARCH * arch;
+        // wings stop beating and fall open: nothing is flying this thing now
+        const [dl, dr] = it.group.userData.wings;
+        const droop = -0.9 * arch;
+        dl.rotation.x = droop; dr.rotation.x = -droop;
+        /* Driven from the bird's own elapsed time rather than accumulated per
+           frame, so the tumble looks the same at 60fps and at 144 — and so a
+           test can ask where it will be at t without simulating every frame. */
+        it.group.rotation.z = it.spin * Math.max(0, it.stomped - 0.06);
+        it.group.position.y = it.gy + it.yOff + it.box.h / 2;
+        continue;
+      }
       /* Beat DEEPER on the climb, never faster.
          The rate used to ride on the climb too (11 +- 5 rad/s), which read as
          two different birds: a roaming one looked panicked next to a hovering
@@ -641,10 +723,13 @@ export class ObstacleField {
 
   /** World-space AABBs for collision. */
   boxes() {
-    return this.items.map((it) => ({
+    /* A stomped bird is scenery. It is still on screen, still falling through
+       the lane the player is running down, and it must not be able to kill
+       them on the way out. */
+    return this.items.filter((it) => !(it.stomped >= 0)).map((it) => ({
       x0: it.x - it.box.w / 2, x1: it.x + it.box.w / 2,
       y0: it.gy + it.yOff, y1: it.gy + it.yOff + it.box.h,
-      name: it.name
+      name: it.name, id: it.id, flying: !!it.kind.flying
     }));
   }
 }

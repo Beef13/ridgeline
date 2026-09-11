@@ -5,6 +5,7 @@ import { buildWorld, SKY_Z } from './world/scene.js';
 import { Streamer } from './world/streamer.js';
 import { ObstacleField, useModel, OBSTACLE_MATERIALS } from './world/obstacles.js';
 import { loadModel } from './world/models.js';
+import { Fireflies } from './world/fireflies.js';
 import { heightAt } from './world/terrain.js';
 import { Runner, STATE, overlaps } from './player/controller.js';
 import { feel } from './player/tuning.js';
@@ -67,6 +68,10 @@ const camDist = () => (VIEW_H / 2) / Math.tan(THREE.MathUtils.degToRad(view.fov)
    sown on their layer — so it is built first and handed over. */
 const streamer = new Streamer(roots);
 const vistas = new Vistas(scene, streamer.scatter);
+/* Ambient, and parented to the parallax roots — so the LOOK panel's per-layer
+   visibility switches turn them off with the rest of that layer rather than
+   needing a toggle of their own. */
+const fireflies = new Fireflies(roots);
 const obstacles = new ObstacleField(roots[1]);
 /* Modelled obstacles, loaded in the background. Deliberately NOT awaited: the
    game is playable on its built-in shapes from the first frame, and the swap
@@ -268,13 +273,32 @@ startLoop({
 
     player.step(dt, inp, true);
     const hundreds = Math.floor(player.distance / 100);
-    if (hundreds > bellsRung) { bellsRung = hundreds; sfx.play('bell'); }
+    if (hundreds > bellsRung) {
+      bellsRung = hundreds;
+      sfx.play('bell');
+      hud.flash(hundreds * 100 + 'M');
+    }
     streamer.update(player.x);
     obstacles.update(player, true, dt);
 
     const box = player.box;
     for (const o of obstacles.boxes()) {
-      if (overlaps(box, o)) {
+      if (!overlaps(box, o)) continue;
+      /* Landing ON a bird is not hitting one.
+         Two conditions, and both are needed. Descending, because a player
+         rising into a bird's belly has clearly mistimed a jump and should die
+         for it. And feet above `stompTop` of the bird's height, because at
+         this scale the boxes overlap for several frames before the sprites
+         touch — judged on overlap alone, running chest-first into a low bird
+         would count as a stomp. */
+      if (o.flying && player.vy < 0 &&
+          box.y0 >= o.y0 + (o.y1 - o.y0) * feel.stompTop &&
+          obstacles.stomp(o.id)) {
+        player.bounce();
+        sfx.play('jump', 0.8);
+        continue;
+      }
+      {
         state = STATE.DEAD;
         deadAt = performance.now() / 1000;
         sfx.play('crash');
@@ -326,6 +350,11 @@ startLoop({
     const sh = 2 * halfTan * (camera.position.z - SKY_Z) * 1.06;
     sky.scale.set(sh * camera.aspect, sh, 1);
     vistas.update(cx, cy, camera.position.z, halfTan, camera.aspect, snap);
+    /* Handed the UNSNAPPED camera. The scene is snapped to whole buffer pixels
+       to stop everything shimmering, but a firefly IS one pixel — snapping its
+       anchor as well would lock it to the same grid as the ridge and the drift
+       would come out in steps. */
+    fireflies.update(cx, cy, t, dt);
 
     /* Before the render, not after: this reads back the PREVIOUS frame, which
        the GPU finished long ago, so it never waits. Sampling it straight after
