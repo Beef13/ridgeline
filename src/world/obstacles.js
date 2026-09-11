@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SRGB } from '../core/colour.js';
 import { heightAt } from './terrain.js';
 import { feel } from '../player/tuning.js';
@@ -38,14 +39,29 @@ import { feel } from '../player/tuning.js';
 const TONE = {
   plank:  { cool: '#33200f', warm: '#5c2b0b', coolSpec: '#5a3a1e', warmSpec: '#8a4a18' },
   timber: { cool: '#57381b', warm: '#8a4a12', coolSpec: '#7d4f2c', warmSpec: '#b06a20' },
-  bird:   { cool: '#3a2213', warm: '#63300c', coolSpec: '#a06a3c', warmSpec: '#c47a22' },
-  birdL:  { cool: '#7d4f2c', warm: '#ab5d16', coolSpec: '#dcb072', warmSpec: '#f0a83e' },
   /* The crate's cargo. Modelled green, shown warm: the ridge and its dressing
      are green, so green cargo reads as scenery rather than as something to
      dodge — and at a 2.9x grade a saturated green clips to a flat glowing slab
      and loses its shape entirely. Pitched a step lighter than the timber so the
      fruit still separates from the box holding it. */
-  fruit:  { cool: '#6e3a12', warm: '#a85a10', coolSpec: '#b07a3a', warmSpec: '#e09a40' }
+  fruit:  { cool: '#6e3a12', warm: '#a85a10', coolSpec: '#b07a3a', warmSpec: '#e09a40' },
+
+  /* The vulture's own palette. It breaks the warm-obstacle rule on purpose, and
+     gets away with it for a reason worth writing down: the rule exists so that
+     what you must dodge separates from a green-and-grey ridge, and a BLACK body
+     separates further than a brown one ever did — it reads as a hole punched in
+     the scenery. What the rule really protects is legibility, and the bright
+     head, beak and feet carry that here. A bird brown all over was obeying the
+     letter of it and losing the point.
+     
+     `bird` is the body, `birdL` the head — the names are kept so the tint
+     slider and everything that already referred to them still work. */
+  bird:   { cool: '#101010', warm: '#1e1206', coolSpec: '#3a3a36', warmSpec: '#55402a' },
+  birdL:  { cool: '#8a4a12', warm: '#b8580c', coolSpec: '#d08a3a', warmSpec: '#f0a040' },
+  beak:   { cool: '#8a6a10', warm: '#c89a14', coolSpec: '#e8d060', warmSpec: '#ffe878' },
+  beakTip:{ cool: '#8a2a0c', warm: '#c4380e', coolSpec: '#e08050', warmSpec: '#ff9060' },
+  // the eye is two pixels of near-white; it clips, and clipping is the point
+  eye:    { cool: '#ded8c8', warm: '#efe8d4', coolSpec: '#ffffff', warmSpec: '#ffffff' }
 };
 
 const M = {
@@ -53,7 +69,18 @@ const M = {
   timber: new THREE.MeshPhongMaterial({ shininess: 14, flatShading: true }),
   bird:   new THREE.MeshPhongMaterial({ shininess: 30, flatShading: true }),
   birdL:  new THREE.MeshPhongMaterial({ shininess: 30, flatShading: true }),
-  fruit:  new THREE.MeshPhongMaterial({ shininess: 24, flatShading: true })
+  fruit:  new THREE.MeshPhongMaterial({ shininess: 24, flatShading: true }),
+  beak:   new THREE.MeshPhongMaterial({ shininess: 40, flatShading: true }),
+  beakTip:new THREE.MeshPhongMaterial({ shininess: 40, flatShading: true }),
+  eye:    new THREE.MeshPhongMaterial({ shininess: 10, flatShading: true }),
+  /* UNLIT, and deliberately so.
+     The underside of a wing faces away from the key light, so a white Phong
+     surface down there renders as murky grey — which is how a "white" underwing
+     ended up reading as a second, wrong shade of dark. A basic material ignores
+     lighting entirely and stays the colour it was given whichever way the wing
+     is pointing, which is the whole job: the stripe has to be BRIGHT at the
+     moment the wing turns over, not merely pale in principle. */
+  wingUnder: new THREE.MeshBasicMaterial({ color: SRGB('#efe9da') })
 };
 
 /** 0 keeps the authored browns, 1 pushes every obstacle to full orange. */
@@ -65,6 +92,20 @@ export function tintObstacles(warm) {
   }
 }
 tintObstacles(0.55);        // a starting point, not a decision — see the panel
+
+/* The wing, feather by feather: width, THICKNESS, depth, and where it sits.
+   Lengths fall and each one is swept further back, so the trailing edge steps
+   rather than running straight.
+
+   Exported because the thickness is the one number here that can be wrong in a
+   way nobody sees coming. Each feather is split through it — dark top, white
+   underside — and a half thinner than a screen pixel does not render dimmer, it
+   renders intermittently. One screen pixel is 1/31 of a unit. */
+export const WING_FEATHERS = [
+  [0.34, 0.086, 0.21, -0.02, 0.000, 0.20],
+  [0.27, 0.082, 0.17, -0.07, 0.005, 0.38],
+  [0.19, 0.078, 0.13, -0.14, 0.010, 0.51]
+];
 
 const rnd = () => Math.random();
 
@@ -81,6 +122,11 @@ const SIGN_WIDTH = 1.5;
 
 export function useModel(name, proto) {
   if (!proto) return;
+  if (name === 'fence') {
+    // one number: how wide the fence is per unit of height, straight off the art
+    const a = proto.userData.aspect;
+    proto.userData.fit = { wPerHeight: a && a.w > 1e-6 ? a.w : 0.36 };
+  }
   if (name === 'sign') {
     /* Work out the real size and the resulting hitbox ONCE, here, rather than
        per spawn. `overhang` is the part the player ducks under, in units of the
@@ -187,8 +233,22 @@ export const KINDS = {
      height to judge against, which the smooth spire never did. */
   fence: {
     weight: 2,
-    box: () => ({ w: 0.62, h: 1.55 + rnd() * 0.35, yOff: 0 }),
+    /* Height is the only thing that varies, so unlike the crate this one is
+       scaled UNIFORMLY and the box width follows the art. Nothing is lost by
+       it: with one free axis there is no reason to squash the posts, and the
+       hitbox stays exactly the shape of the thing you can see. */
+    box: () => {
+      const h = 1.55 + rnd() * 0.35;
+      const m = MODEL.fence;
+      if (m && m.userData.fit) return { w: m.userData.fit.wPerHeight * h, h, yOff: 0 };
+      return { w: 0.62, h, yOff: 0 };
+    },
     build(b) {
+      if (MODEL.fence) {
+        const g = MODEL.fence.clone();
+        g.scale.setScalar(b.h);     // the model is 1 tall, so this IS its height
+        return g;
+      }
       const g = new THREE.Group();
       const postW = 0.15, d = 0.16;
       const px = b.w / 2 - postW / 2;
@@ -318,17 +378,107 @@ export const KINDS = {
       return { w: 0.95, h: 0.62, yOff: high ? HIGH : LOW, high };
     },
     build(b) {
+      /* A vulture, at 29 pixels across.
+       *
+       * The old bird was a stretched sphere with a smaller sphere for a head,
+       * and it read as a blob — which is fatal for the one obstacle whose whole
+       * job is to be IDENTIFIED before it is reacted to. Everything here is
+       * bought with silhouette: a hooked beak, hunched shoulders, a ragged
+       * trailing edge and dangling talons. Nothing under about 0.09 units
+       * survives the palette snap, so there is no interior detail at all —
+       * every shape below either breaks the outline or is not there.
+       *
+       * Dark body, light head. Vultures read that way, and it also keeps the
+       * brightest part of the bird up at the end the player has to judge. */
       const g = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), M.bird);
-      body.scale.set(1.5, 0.8, 0.8);
-      g.add(body);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), M.birdL);
-      head.position.set(0.34, 0.08, 0); g.add(head);
+
+      const add = (mesh, x, y, z, rz = 0) => {
+        mesh.position.set(x, y, z);
+        if (rz) mesh.rotation.z = rz;
+        g.add(mesh);
+        return mesh;
+      };
+      const ball = (r, mat, sx, sy, sz) => {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), mat);
+        m.scale.set(sx, sy, sz);
+        return m;
+      };
+      const slab = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+
+      add(ball(0.20, M.bird, 1.45, 1.0, 0.95), -0.10, -0.04, 0);
+      // the hunch. More than anything else this is what says vulture rather
+      // than gull, and it costs one sphere.
+      add(ball(0.13, M.bird, 1.2, 0.95, 1.1), 0.02, 0.12, 0);
+      // tail, tipped up and cut square — a ragged back end reads at distance
+      // where a tapered one turns to mush
+      add(slab(0.23, 0.12, 0.17, M.bird), -0.33, 0.02, 0, 0.30);
+
+      add(ball(0.135, M.birdL, 1.1, 1.05, 1.0), 0.20, 0.10, 0);
+      /* One white pixel either side, set proud of the head so it survives being
+         seen edge-on. A pupil would be the obvious next move and is the wrong
+         one: at this size it would eat the whole eye and leave a dark smudge,
+         and the brow already supplies the glare. */
+      for (const sd of [1, -1]) add(ball(0.028, M.eye, 1, 1.15, 1), 0.255, 0.135, sd * 0.118);
+      /* Brow. Two pixels of it, and worth every one: an angled bar over the eye
+         is the difference between a bird and an angry bird, and the top edge of
+         the head is part of the outline. */
+      add(slab(0.17, 0.07, 0.15, M.birdL), 0.21, 0.20, 0, -0.32);
+      /* The beak stops short of the hitbox edge on purpose. Art that reaches
+         outside the box kills from somewhere it visibly is not, and a beak is
+         exactly the part a player judges the gap by. */
+      // the beak, in two parts — a straight upper and a hook. One tapered cone
+      // would vanish; the step between the two is what the eye catches.
+      add(slab(0.23, 0.10, 0.11, M.beak), 0.325, 0.065, 0, 0.06);
+      add(slab(0.085, 0.14, 0.10, M.beakTip), 0.405, -0.02, 0, 0.10);
+
+      // talons, trailing under the body: the lowest thing on the bird and the
+      // first thing a player sees when it passes overhead
+      for (const s of [1, -1]) add(slab(0.06, 0.11, 0.055, M.beak), 0.04, -0.21, s * 0.07);
+
+      /* Wings pivot on x, so they rise and fall while reaching out in z —
+         edge-on at rest, broad at the top of the beat. Three feathers of
+         falling length, each swept further back, so the trailing edge is
+         stepped rather than straight. */
       const wing = (s) => {
         const p = new THREE.Group();
-        const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.34), M.birdL);
-        m.position.set(-0.05, 0, s * 0.24);
-        p.add(m);
+        /* Three feathers, but only TWO meshes — one for the dark tops merged
+           together and one for the pale undersides.
+           
+           Painting the underside as the box's own -y face is the tidy-looking
+           answer and the expensive one: a material ARRAY makes three.js honour
+           BoxGeometry's six per-face groups and issue a draw call for each, so
+           six feathers would cost 36 calls instead of six. Merging by colour
+           instead costs four for the whole pair of wings — fewer than the
+           single-colour version this replaced. */
+        /* The wing is split through its THICKNESS: dark top half, white bottom
+           half, nothing hanging below.
+           
+           The first attempt hung a thin pale strip under each feather and it
+           shimmered — at 0.012 units it was about a THIRD of a screen pixel, so
+           whether it existed at all came down to where the sampling grid
+           happened to fall that frame. Anything thinner than a pixel does not
+           get dimmer, it gets intermittent. Halving a feather that is thick
+           enough to survive gives a white underside with no sub-pixel geometry
+           anywhere in it. */
+        /* Dark on top, white underneath, and nothing in between.
+           
+           An earlier version inset a bright stripe along each feather and left
+           the body's dark either side of it. On paper that is a vulture's
+           underwing; on a 10-pixel wing it is a white patch cut through by dark
+           lines, which reads as damage rather than as plumage. At this size the
+           underside gets ONE colour or it gets noise. */
+        const dark = [], pale = [];
+        for (const [w, h, d, x, y, z] of WING_FEATHERS) {
+          const half = h / 2;
+          const top = new THREE.BoxGeometry(w, half, d);
+          top.translate(x, y + half / 2, s * z);
+          dark.push(top);
+          const under = new THREE.BoxGeometry(w, half, d);
+          under.translate(x, y - half / 2, s * z);
+          pale.push(under);
+        }
+        p.add(new THREE.Mesh(mergeGeometries(dark), M.bird));
+        p.add(new THREE.Mesh(mergeGeometries(pale), M.wingUnder));
         return p;
       };
       const wl = wing(1), wr = wing(-1);

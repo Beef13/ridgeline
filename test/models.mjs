@@ -204,5 +204,48 @@ console.log('sign');
     Math.abs(b.max.x - b.min.x - SIGN_WIDTH) < 1e-3, (b.max.x - b.min.x).toFixed(3));
 }
 
+// ===========================================================================
+console.log('fence');
+{
+  const { parts, primitives } = read('fence.glb');
+  check('  the posts take the game palette', parts.some((p) => p.key === 'timber'),
+    parts.map((p) => p.key).join(', '));
+  check('  thorns and vine keep their own colours',
+    parts.filter((p) => p.key.startsWith('own:') && p.key.length > 4).length >= 2,
+    parts.map((p) => p.key).join(', '));
+  /* A mesh with NO material name is almost always one that never got a material
+     assigned, so it carries Rhino's default rather than a decision — and the
+     default is black, which reads as a hole punched in the obstacle. The loader
+     lets it through and warns; this is the fence's own guard against it coming
+     back on the next export. */
+  check('  and no mesh is left nameless', !parts.some((p) => p.key === 'own:'),
+    parts.map((p) => p.key).join(', '));
+
+  const { aspect } = normalise(parts, { uniform: true });
+  const box = bounds(parts);
+  const size = new THREE.Vector3(); box.getSize(size);
+  check('  height is 1 and it stands on the ground',
+    Math.abs(size.y - 1) < 1e-5 && Math.abs(box.min.y) < 1e-5);
+  check('  proportions preserved, not squashed sideways',
+    Math.abs(size.x - aspect.w) < 1e-5, `width ${size.x.toFixed(3)}`);
+
+  /* Only the HEIGHT randomises, so the width follows from the art rather than
+     being authored — which keeps the hitbox exactly the shape you can see. */
+  for (const h of [1.55, 1.73, 1.90]) {
+    const g = new THREE.Group();
+    for (const p of parts) g.add(new THREE.Mesh(p.geometry));
+    g.scale.setScalar(h);
+    g.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(g);
+    const w = aspect.w * h;
+    check(`  at ${h.toFixed(2)}u tall the art fills its box`,
+      Math.abs(b.max.y - b.min.y - h) < 1e-4 && Math.abs(b.max.x - b.min.x - w) < 1e-4,
+      `${(b.max.x - b.min.x).toFixed(3)} x ${(b.max.y - b.min.y).toFixed(3)}`);
+  }
+  /* A fence is jumped, so what matters is that it stays clearable. The jump
+     apex is a shade under 2u, and a fence taller than that is a wall. */
+  check('  the tallest fence is still jumpable', 1.90 < 1.95, 'apex ~1.99u vs 1.90 tallest');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

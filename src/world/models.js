@@ -69,12 +69,26 @@ const cache = Object.create(null);
  * nodes, and merging without applying them would stack all 81 pieces at the
  * origin — a crate-shaped pile of splinters.
  */
-function flatten(scene, materials) {
+const warned = new Set();
+function warnOnce(url, msg) {
+  const k = url + '|' + msg;
+  if (warned.has(k)) return;
+  warned.add(k);
+  console.warn('[models]', url, '-', msg);
+}
+
+function flatten(scene, materials, url) {
   const byKey = new Map();
   scene.updateMatrixWorld(true);
   scene.traverse((o) => {
     if (!o.isMesh || !o.geometry) return;
     const name = String(o.material?.name || '').toLowerCase();
+    /* A nameless material is almost always an object that never got one
+       assigned, so it carries Rhino's default rather than a decision. It still
+       goes through — the name is the interface and an empty name is a name —
+       but it is worth saying out loud, because the usual result is a
+       featureless black slab that looks like a hole in the obstacle. */
+    if (!name) warnOnce(url, 'a mesh has no material name; it will keep whatever colour it was given');
     // unmapped names keep their own colour, and each one gets its own group
     const key = MAP[name] || ('own:' + name);
     if (!materials[key] && key.startsWith('own:')) materials[key] = ownMaterial(o.material);
@@ -176,7 +190,7 @@ export function loadModel(name, url, materials, opts = {}) {
   cache[name] = new Promise((resolve) => {
     loader.load(url, (gltf) => {
       try {
-        const parts = flatten(gltf.scene, materials);
+        const parts = flatten(gltf.scene, materials, url);
         if (!parts.length) throw new Error('no meshes in ' + url);
         const info = normalise(parts, opts);
         resolve(prototype(parts, info));

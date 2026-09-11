@@ -77,6 +77,10 @@ loadModel('crate', MODEL_BASE + 'crate.glb', OBSTACLE_MATERIALS)
 // uniform: a signpost is one fixed shape, not a box to be stretched
 loadModel('sign', MODEL_BASE + 'sign.glb', OBSTACLE_MATERIALS, { uniform: true })
   .then((proto) => useModel('sign', proto));
+// uniform too: only the fence's HEIGHT varies, so there is nothing to gain by
+// squashing it sideways as well
+loadModel('fence', MODEL_BASE + 'fence.glb', OBSTACLE_MATERIALS, { uniform: true })
+  .then((proto) => useModel('fence', proto));
 const player = new Runner();
 const fig = makeFigure();
 roots[1].add(fig.group);
