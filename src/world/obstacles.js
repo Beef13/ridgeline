@@ -39,14 +39,21 @@ const TONE = {
   plank:  { cool: '#33200f', warm: '#5c2b0b', coolSpec: '#5a3a1e', warmSpec: '#8a4a18' },
   timber: { cool: '#57381b', warm: '#8a4a12', coolSpec: '#7d4f2c', warmSpec: '#b06a20' },
   bird:   { cool: '#3a2213', warm: '#63300c', coolSpec: '#a06a3c', warmSpec: '#c47a22' },
-  birdL:  { cool: '#7d4f2c', warm: '#ab5d16', coolSpec: '#dcb072', warmSpec: '#f0a83e' }
+  birdL:  { cool: '#7d4f2c', warm: '#ab5d16', coolSpec: '#dcb072', warmSpec: '#f0a83e' },
+  /* The crate's cargo. Modelled green, shown warm: the ridge and its dressing
+     are green, so green cargo reads as scenery rather than as something to
+     dodge — and at a 2.9x grade a saturated green clips to a flat glowing slab
+     and loses its shape entirely. Pitched a step lighter than the timber so the
+     fruit still separates from the box holding it. */
+  fruit:  { cool: '#6e3a12', warm: '#a85a10', coolSpec: '#b07a3a', warmSpec: '#e09a40' }
 };
 
 const M = {
   plank:  new THREE.MeshPhongMaterial({ shininess: 8,  flatShading: true }),
   timber: new THREE.MeshPhongMaterial({ shininess: 14, flatShading: true }),
   bird:   new THREE.MeshPhongMaterial({ shininess: 30, flatShading: true }),
-  birdL:  new THREE.MeshPhongMaterial({ shininess: 30, flatShading: true })
+  birdL:  new THREE.MeshPhongMaterial({ shininess: 30, flatShading: true }),
+  fruit:  new THREE.MeshPhongMaterial({ shininess: 24, flatShading: true })
 };
 
 /** 0 keeps the authored browns, 1 pushes every obstacle to full orange. */
@@ -60,6 +67,43 @@ export function tintObstacles(warm) {
 tintObstacles(0.55);        // a starting point, not a decision — see the panel
 
 const rnd = () => Math.random();
+
+/* Filled in by `useModel` once a .glb has loaded. Empty is the normal state
+   for the first second of a session, and a permanent one if the file is
+   missing — every kind still has its built-in shape to fall back on. */
+const MODEL = Object.create(null);
+
+/* How wide a signpost should end up. The model is normalised to a height of 1,
+   so this is what sets its real size — chosen over matching its height because
+   the horizontal footprint is what the spacing and the difficulty were tuned
+   against. */
+const SIGN_WIDTH = 1.5;
+
+export function useModel(name, proto) {
+  if (!proto) return;
+  if (name === 'sign') {
+    /* Work out the real size and the resulting hitbox ONCE, here, rather than
+       per spawn. `overhang` is the part the player ducks under, in units of the
+       normalised height; scaled up it becomes the box. */
+    const a = proto.userData.aspect, o = proto.userData.overhang;
+    const scale = a && a.w > 1e-6 ? SIGN_WIDTH / a.w : 1;
+    proto.userData.fit = o
+      ? { w: SIGN_WIDTH, yOff: o.y0 * scale, h: (o.y1 - o.y0) * scale, scale }
+      : { w: SIGN_WIDTH, yOff: 1.12, h: 1.35, scale };
+    /* A sign you cannot duck is not a sign, it is a wall. Ducked height is
+       0.82 and standing is 1.62, so the underside has to sit between them —
+       worth failing loudly on, because a model that breaks this looks fine and
+       plays as an unavoidable death. */
+    const f = proto.userData.fit;
+    if (f.yOff <= 0.9 || f.yOff >= 1.6) {
+      console.warn('[models] sign underside at', f.yOff.toFixed(2),
+        '— must be between 0.9 (ducked) and 1.6 (standing); using the built-in sign');
+      return;
+    }
+  }
+  MODEL[name] = proto;
+}
+export { M as OBSTACLE_MATERIALS };
 
 /* The two altitudes a bird can occupy. The player stands 1.62 and ducks to
    0.82, so LOW cannot be ducked and has to be jumped, and HIGH cannot be
@@ -98,6 +142,18 @@ export const KINDS = {
     weight: 4,
     box: () => ({ w: 0.95 + rnd() * 0.4, h: 0.8 + rnd() * 0.25, yOff: 0 }),
     build(b) {
+      /* The modelled crate if it has arrived, the built-in one if not.
+         Checked per spawn rather than once at startup: the .glb lands a moment
+         after the first frame, and a game that refuses to start until its art
+         is ready is a worse trade than a few early crates in primitives. */
+      if (MODEL.crate) {
+        const g = MODEL.crate.clone();
+        /* The prototype is a unit crate — centred on x and z, sitting on y=0,
+           exactly 1 tall — so this IS the collision box, not an approximation
+           of it. Depth follows height, so a wide spawn does not also get deep. */
+        g.scale.set(b.w, b.h, b.h);
+        return g;
+      }
       const g = new THREE.Group();
       const d = 0.78;                       // deep enough to catch the key light
       const t = 0.1;                        // batten thickness: ~3px, the floor
@@ -174,8 +230,28 @@ export const KINDS = {
      stops trusting the art. */
   sign: {
     weight: 2,
-    box: () => ({ w: 1.5, h: 1.35, yOff: 1.12 }),
+    /* With a model loaded the hitbox is READ OFF THE ART rather than authored
+       here, because the two must be the same shape and only one of them can be
+       the source of truth. The modelled boards hang lower and shallower than
+       these numbers assumed, and keeping the authored box would have killed the
+       player in 30cm of clear air below the sign — exactly the thing the
+       comment above says a player notices once and then stops trusting.
+
+       The authored numbers stay as the fallback, for the seconds before the
+       file lands and for good if it never does. */
+    box: () => {
+      const m = MODEL.sign;
+      if (m && m.userData.fit) return { ...m.userData.fit };
+      return { w: 1.5, h: 1.35, yOff: 1.12 };
+    },
     build(b) {
+      if (MODEL.sign) {
+        const g = MODEL.sign.clone();
+        // one uniform factor: a signpost is a fixed shape, and stretching the
+        // board to a box would take the mast with it
+        g.scale.setScalar(MODEL.sign.userData.fit.scale);
+        return g;
+      }
       const g = new THREE.Group();
       const right = b.w / 2 - 0.09;         // where the mast stands
       const boardZ = 0.05, mastZ = -0.42;

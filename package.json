@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 8899",
-    "test:logic": "node test/logic.mjs && node test/ground.mjs && node test/scatter.mjs && node test/obstacles.mjs && node test/figure.mjs && node test/input.mjs && node test/loop.mjs",
+    "test:logic": "node test/logic.mjs && node test/ground.mjs && node test/scatter.mjs && node test/obstacles.mjs && node test/figure.mjs && node test/input.mjs && node test/loop.mjs && node test/models.mjs",
     "test:browser": "node test/mech.mjs && node test/audio.mjs"
   },
   "dependencies": {

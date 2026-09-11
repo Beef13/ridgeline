@@ -3,7 +3,8 @@ import { Pipeline } from './render/pipeline.js';
 import { PAL_RGB } from './render/palette.js';
 import { buildWorld, SKY_Z } from './world/scene.js';
 import { Streamer } from './world/streamer.js';
-import { ObstacleField } from './world/obstacles.js';
+import { ObstacleField, useModel, OBSTACLE_MATERIALS } from './world/obstacles.js';
+import { loadModel } from './world/models.js';
 import { heightAt } from './world/terrain.js';
 import { Runner, STATE, overlaps } from './player/controller.js';
 import { feel } from './player/tuning.js';
@@ -67,6 +68,15 @@ const camDist = () => (VIEW_H / 2) / Math.tan(THREE.MathUtils.degToRad(view.fov)
 const streamer = new Streamer(roots);
 const vistas = new Vistas(scene, streamer.scatter);
 const obstacles = new ObstacleField(roots[1]);
+/* Modelled obstacles, loaded in the background. Deliberately NOT awaited: the
+   game is playable on its built-in shapes from the first frame, and the swap
+   happens on the next spawn once the file lands. */
+const MODEL_BASE = ((typeof import.meta.env !== 'undefined' && import.meta.env.BASE_URL) || '/') + 'models/';
+loadModel('crate', MODEL_BASE + 'crate.glb', OBSTACLE_MATERIALS)
+  .then((proto) => useModel('crate', proto));
+// uniform: a signpost is one fixed shape, not a box to be stretched
+loadModel('sign', MODEL_BASE + 'sign.glb', OBSTACLE_MATERIALS, { uniform: true })
+  .then((proto) => useModel('sign', proto));
 const player = new Runner();
 const fig = makeFigure();
 roots[1].add(fig.group);
