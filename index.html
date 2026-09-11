@@ -168,6 +168,13 @@
         font-size: 11px;
         letter-spacing: 0.32em;
         color: var(--faint);
+        white-space: nowrap;      /* one line, or the tracking makes it two */
+      }
+      /* The byline gained a version and an edition name, and at 0.32em of
+         tracking that is 325px of text — wider than a small phone. Tighten
+         the tracking rather than let it wrap or clip. */
+      @media (max-width: 380px) {
+        footer { letter-spacing: 0.16em; font-size: 10px; }
       }
 
       /* Loading veil. Opaque black over everything until the art has landed —
@@ -278,7 +285,7 @@
         </svg>
       </button>
 
-      <footer>Beef13 &middot; 2026</footer>
+      <footer>Beef13 &middot; 2026 &middot; v__VERSION__ &middot; Granite</footer>
     </div>
     <script>
       /* The last word on the iOS magnifier.

@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ART = resolve('public/art');
@@ -37,12 +37,28 @@ function artIndex() {
   };
 }
 
+/**
+ * The version in the footer, taken from package.json.
+ *
+ * Written out by hand in the HTML it would be right on the day it shipped and
+ * quietly wrong from the next release onward — a footer nobody looks at is
+ * exactly where a stale number survives. One source of truth, substituted at
+ * serve time and at build time, so dev and the published site cannot disagree.
+ */
+function version() {
+  const v = JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version;
+  return {
+    name: 'ridgeline-version',
+    transformIndexHtml: (html) => html.replaceAll('__VERSION__', v)
+  };
+}
+
 export default defineConfig({
   /* Relative, so the same build works at a domain root AND under a project
      subpath like /ridgeline/ on GitHub Pages. Pinning an absolute base would
      mean one build per destination. */
   base: './',
-  plugins: [artIndex()],
+  plugins: [artIndex(), version()],
   server: { open: true },
   build: { target: 'es2022' }
 });
