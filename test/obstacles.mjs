@@ -167,6 +167,65 @@ function HIGH_BLOCKS(standH) { return standH > 0.70 && standH < 1.72 + 0.62; }
   check('bird: talons hang clear of the belly', !low.isEmpty() && (cy - low.min.y) > 3 * PX,
     low.isEmpty() ? 'none' : `${((cy - low.min.y) / PX).toFixed(1)}px below centre`);
 
+  /* The neck is what makes it read as a vulture rather than a gull.
+     In the first version the shoulders and the head overlapped, so they merged
+     into one lump and there was nothing to recognise — a vulture is a small
+     head held out clear on a bare neck, and the GAP is the whole cue. There is
+     no spare room in a 0.95-wide box to add one, so it was reclaimed by
+     shrinking the body; this measures that it stayed reclaimed. */
+  {
+    const obs2 = await import('../src/world/obstacles.js');
+    const M2 = obs2.OBSTACLE_MATERIALS;
+    const bird = obs2.KINDS.raptor.build({ w: 0.95, h: 0.62, yOff: 0.70 });
+    const inWing = new Set();
+    for (const w of bird.userData.wings) w.traverse((o) => inWing.add(o));
+    const span = (mat) => {
+      const bb = new THREE.Box3();
+      bird.traverse((o) => { if (o.isMesh && !inWing.has(o) && o.material === mat) bb.expandByObject(o); });
+      return bb;
+    };
+    /* "Everything that is not the body" rather than "everything painted the
+       head's colour": the head, neck and brow have each changed material at
+       least once, and a test that names one of them measures whichever part
+       still happens to wear it. */
+    const spanNot = (mat) => {
+      const bb = new THREE.Box3();
+      bird.traverse((o) => { if (o.isMesh && !inWing.has(o) && o.material !== mat) bb.expandByObject(o); });
+      return bb;
+    };
+    const body = span(M2.bird), headAndNeck = spanNot(M2.bird);
+    check('bird: the head is held clear of the shoulders',
+      (headAndNeck.max.x - body.max.x) / (1 / 31) > 6,
+      `${((headAndNeck.max.x - body.max.x) / (1 / 31)).toFixed(1)}px of head and neck beyond the body`);
+
+    /* And it must climb. A neck that leaves the shoulders level, or droops,
+       reads as a hunched pigeon bracing for impact — which is what the first
+       attempt did, because the segments were tilted nose-DOWN while their
+       centres crept up, and the two cancelled out. The angle comes off a line
+       drawn over a screenshot, so it is a judgement someone made once and this
+       is what stops it drifting back. */
+    const rise = obs2.NECK_RISE * 180 / Math.PI;
+    check('and the neck climbs rather than droops', rise > 15 && rise < 30,
+      `${rise.toFixed(1)} degrees`);
+    check('and the segments tilt WITH the climb, not against it',
+      obs2.NECK_RISE > 0, `${obs2.NECK_RISE}`);
+
+    /* A wing hinges on the SHOULDER. The pivot used to be the bird's origin,
+       which was fine until the body was shrunk and moved back to make room for
+       the neck — the origin then sat at the body's front edge and the wings
+       beat out in front of it, like a man swimming. Anything that moves the
+       body has to move the hinge with it, so this measures the two against
+       each other rather than trusting a number. */
+    bird.updateMatrixWorld(true);
+    const wingBox = new THREE.Box3();
+    for (const w of bird.userData.wings) wingBox.expandByObject(w);
+    const bodyBox = new THREE.Box3();
+    bird.traverse((o) => { if (o.isMesh && !inWing.has(o) && o.material === M2.bird) bodyBox.expandByObject(o); });
+    check('bird: the wings beat ON the body, not in front of it',
+      wingBox.min.x >= bodyBox.min.x - 0.02 && wingBox.max.x <= bodyBox.max.x + 0.02,
+      `wings ${wingBox.min.x.toFixed(2)}..${wingBox.max.x.toFixed(2)} vs body ${bodyBox.min.x.toFixed(2)}..${bodyBox.max.x.toFixed(2)}`);
+  }
+
   const wings = g.userData.wings;
   check('bird: it has two wings that can be flapped', Array.isArray(wings) && wings.length === 2);
   const span = new THREE.Box3();
@@ -199,7 +258,7 @@ function HIGH_BLOCKS(standH) { return standH > 0.70 && standH < 1.72 + 0.62; }
     return { r: Math.min(1, c.r * GRADE), g: Math.min(1, c.g * GRADE), b: Math.min(1, c.b * GRADE) };
   };
   const body = graded('bird'), head = graded('birdL');
-  const beak = graded('beak'), tip = graded('beakTip'), eye = graded('eye');
+  const beak = graded('beak'), tip = graded('beakTip');
 
   check('bird: the body stays black through the grade',
     Math.max(body.r, body.g, body.b) < 0.35,
@@ -212,9 +271,37 @@ function HIGH_BLOCKS(standH) { return standH > 0.70 && standH < 1.72 + 0.62; }
   check('and the red tip still separates from the yellow beak',
     beak.g - tip.g > 0.3, `green ${beak.g.toFixed(2)} vs ${tip.g.toFixed(2)}`);
 
-  // the eye is meant to blow out — a clipped white dot is exactly the read
-  check('and the eye clips to white, which is the point',
-    eye.r >= 1 && eye.g >= 1 && eye.b >= 1);
+  /* The bare head and neck. Red pins at 1.0 on the skin AND on the beak, so
+     the one channel that can still tell a pink head from a yellow beak is
+     BLUE — the beak has almost none and the skin has to keep plenty. */
+  const skin = graded('skin');
+  check('and the pink head separates from the yellow beak',
+    skin.b - beak.b > 0.35, `blue ${skin.b.toFixed(2)} vs ${beak.b.toFixed(2)}`);
+  /* Pink, not white and not red: light enough to read as bare skin, but with
+     green and blue still short of the clip or it is simply a white head. */
+  check('and it is still pink after the grade, not white',
+    skin.r > 0.9 && skin.g > 0.5 && skin.g < 0.9 && Math.abs(skin.g - skin.b) < 0.2,
+    `rgb ${skin.r.toFixed(2)} ${skin.g.toFixed(2)} ${skin.b.toFixed(2)}`);
+
+  /* UNLIT, for the same reason the underwing is: an eye that dims as the bird
+     banks away from the sun blinks out at exactly the moment a player is
+     trying to read it. */
+  check('and the eye is pure black and unlit',
+    M.pupil.type === 'MeshBasicMaterial' && M.pupil.color.getHexString() === '000000');
+
+  /* And it has to exist on EVERY frame. Below a pixel it is not a small eye,
+     it is an intermittent one — present or absent depending on where the
+     sampling grid falls. Same failure as the first underwing stripe. */
+  {
+    const PX = 1 / 31;
+    const bird = obs.KINDS.raptor.build({ w: 0.95, h: 0.62, yOff: 0.70 });
+    bird.updateMatrixWorld(true);
+    const bb = new THREE.Box3();
+    bird.traverse((o) => { if (o.isMesh && o.material === M.pupil) bb.expandByObject(o); });
+    const p = new THREE.Vector3(); bb.getSize(p);
+    check('and the eye clears a screen pixel',
+      p.x / PX > 1 && p.y / PX > 1, `${(p.x / PX).toFixed(1)} x ${(p.y / PX).toFixed(1)}px`);
+  }
 
   /* Pale undersides are what turn the flap into a BLINK. A dark bird beating
      dark wings against a dark ridge is a shape changing size, which peripheral

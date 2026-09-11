@@ -60,8 +60,14 @@ const TONE = {
   birdL:  { cool: '#8a4a12', warm: '#b8580c', coolSpec: '#d08a3a', warmSpec: '#f0a040' },
   beak:   { cool: '#8a6a10', warm: '#c89a14', coolSpec: '#e8d060', warmSpec: '#ffe878' },
   beakTip:{ cool: '#8a2a0c', warm: '#c4380e', coolSpec: '#e08050', warmSpec: '#ff9060' },
-  // the eye is two pixels of near-white; it clips, and clipping is the point
-  eye:    { cool: '#ded8c8', warm: '#efe8d4', coolSpec: '#ffffff', warmSpec: '#ffffff' }
+  /* The bare head and neck. A pink authored as pink comes out white: red clips
+     long before the 2.9x grade is done with it, so the only thing that can
+     still say "pink" afterwards is how much BLUE survives — enough to lift it
+     off the yellow beak, not so much it goes lilac. These are authored high
+     because the grade works in LINEAR light, not in the sRGB the hex is
+     written in: #80 is a fifth of the way up, not half. Landed by measuring —
+     red pins at 1.0, green ~0.70, blue ~0.63, which is a pale warm pink. */
+  skin:   { cool: '#c88780', warm: '#d8837a', coolSpec: '#d89890', warmSpec: '#e8a094' }
 };
 
 const M = {
@@ -72,7 +78,12 @@ const M = {
   fruit:  new THREE.MeshPhongMaterial({ shininess: 24, flatShading: true }),
   beak:   new THREE.MeshPhongMaterial({ shininess: 40, flatShading: true }),
   beakTip:new THREE.MeshPhongMaterial({ shininess: 40, flatShading: true }),
-  eye:    new THREE.MeshPhongMaterial({ shininess: 10, flatShading: true }),
+  skin:   new THREE.MeshPhongMaterial({ shininess: 18, flatShading: true }),
+  /* UNLIT, for the same reason the underwing is: an eye that dims when the bird
+     banks away from the sun blinks out at exactly the moment the player is
+     trying to read which way it is going. Black stays black whichever way the
+     head turns. */
+  pupil:  new THREE.MeshBasicMaterial({ color: 0x000000 }),
   /* UNLIT, and deliberately so.
      The underside of a wing faces away from the key light, so a white Phong
      surface down there renders as murky grey — which is how a "white" underwing
@@ -101,6 +112,20 @@ tintObstacles(0.55);        // a starting point, not a decision — see the pane
    way nobody sees coming. Each feather is split through it — dark top, white
    underside — and a half thinner than a screen pixel does not render dimmer, it
    renders intermittently. One screen pixel is 1/31 of a unit. */
+/* How steeply the neck climbs from the shoulders to the head, in radians.
+   Taken off a line drawn over a screenshot — about 21 degrees. The number
+   matters more than it looks: a neck that climbs reads as a vulture craning
+   forward, and the same neck level or drooping reads as a hunched pigeon. */
+export const NECK_RISE = 0.36;
+
+/* Where a wing hinges, in the bird's own space.
+   It used to be the origin, which was fine until the body was shrunk and moved
+   back to make room for the neck — the origin then sat at the body's FRONT
+   edge, and the wings beat in front of the bird like a man swimming. A hinge
+   belongs on the shoulder, so it is measured from the body rather than assumed
+   to be at zero. */
+export const WING_ROOT = [-0.13, 0.03, 0];
+
 export const WING_FEATHERS = [
   [0.34, 0.086, 0.21, -0.02, 0.000, 0.20],
   [0.27, 0.082, 0.17, -0.07, 0.005, 0.38],
@@ -405,31 +430,58 @@ export const KINDS = {
       };
       const slab = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
 
-      add(ball(0.20, M.bird, 1.45, 1.0, 0.95), -0.10, -0.04, 0);
-      // the hunch. More than anything else this is what says vulture rather
-      // than gull, and it costs one sphere.
-      add(ball(0.13, M.bird, 1.2, 0.95, 1.1), 0.02, 0.12, 0);
+      /* Body and shoulders are both a size down from where they started, and
+         sit further back. There is no room in a 0.95-wide box to ADD a neck —
+         the bird already filled 0.91 of it — so the neck is reclaimed from the
+         mass behind it rather than bolted on the front. */
+      add(ball(0.20, M.bird, 1.18, 0.96, 0.95), -0.16, -0.05, 0);
+      // the hunch, pulled back to leave daylight between it and the head, and
+      // dropped so the neck has somewhere to climb FROM
+      add(ball(0.12, M.bird, 1.1, 0.95, 1.1), -0.06, 0.075, 0);
+      /* The neck.
+         The old bird's shoulders and head overlapped, so they merged into one
+         lump and it read as a gull — a vulture is a small head held out on a
+         bare neck, and without the gap between the two there is nothing to
+         recognise. Two tapering segments angling up and forward, because a
+         single straight tube reads as a stick. */
+      /* NECK_RISE is the angle the whole assembly climbs at, and the segments
+         are rotated to match it rather than against it. The first version had
+         them tilted the other way — nose-down while the centres crept up — and
+         the two cancelled into the hunched, shrugging look of a bird bracing
+         for impact. A vulture's neck leaves the shoulders and goes UP. */
+      // the same yellow as the feet — a bare neck and bare legs are the same
+      // skin on a real vulture, and matching them ties the two ends together
+      add(slab(0.135, 0.105, 0.105, M.skin), 0.090, 0.104, 0, NECK_RISE + 0.04);
+      add(slab(0.125, 0.095, 0.095, M.skin), 0.165, 0.132, 0, NECK_RISE - 0.04);
       // tail, tipped up and cut square — a ragged back end reads at distance
       // where a tapered one turns to mush
       add(slab(0.23, 0.12, 0.17, M.bird), -0.33, 0.02, 0, 0.30);
 
-      add(ball(0.135, M.birdL, 1.1, 1.05, 1.0), 0.20, 0.10, 0);
-      /* One white pixel either side, set proud of the head so it survives being
-         seen edge-on. A pupil would be the obvious next move and is the wrong
-         one: at this size it would eat the whole eye and leave a dark smudge,
-         and the brow already supplies the glare. */
-      for (const sd of [1, -1]) add(ball(0.028, M.eye, 1, 1.15, 1), 0.255, 0.135, sd * 0.118);
+      // a smaller head, held further forward: the proportions of a vulture are
+      // a big beak and a small skull, which is lucky, because the beak is what
+      // survives at this size
+      add(ball(0.115, M.skin, 1.1, 1.05, 1.0), 0.245, 0.162, 0);
+      /* A bare black dot on the yellow head, set proud of it so it survives
+         being seen edge-on. No white around it: on a head this size the white
+         was most of the eye and the dot was a speck inside it, which read as a
+         pale patch rather than as an eye. Yellow does the work the white was
+         doing, and the dot gets to be the whole of it.
+         
+         It still has to clear a screen pixel. Anything smaller is not a small
+         eye, it is an intermittent one — present or absent depending on where
+         the sampling grid falls that frame. */
+      for (const sd of [1, -1]) add(ball(0.023, M.pupil, 1, 1, 0.9), 0.280, 0.186, sd * 0.106);
       /* Brow. Two pixels of it, and worth every one: an angled bar over the eye
          is the difference between a bird and an angry bird, and the top edge of
          the head is part of the outline. */
-      add(slab(0.17, 0.07, 0.15, M.birdL), 0.21, 0.20, 0, -0.32);
+      add(slab(0.15, 0.065, 0.13, M.birdL), 0.255, 0.246, 0, -0.32);
       /* The beak stops short of the hitbox edge on purpose. Art that reaches
          outside the box kills from somewhere it visibly is not, and a beak is
          exactly the part a player judges the gap by. */
       // the beak, in two parts — a straight upper and a hook. One tapered cone
       // would vanish; the step between the two is what the eye catches.
-      add(slab(0.23, 0.10, 0.11, M.beak), 0.325, 0.065, 0, 0.06);
-      add(slab(0.085, 0.14, 0.10, M.beakTip), 0.405, -0.02, 0, 0.10);
+      add(slab(0.21, 0.095, 0.105, M.beak), 0.345, 0.132, 0, 0.10);
+      add(slab(0.08, 0.13, 0.095, M.beakTip), 0.418, 0.052, 0, 0.16);
 
       // talons, trailing under the body: the lowest thing on the bird and the
       // first thing a player sees when it passes overhead
@@ -441,6 +493,7 @@ export const KINDS = {
          stepped rather than straight. */
       const wing = (s) => {
         const p = new THREE.Group();
+        p.position.set(WING_ROOT[0], WING_ROOT[1], WING_ROOT[2]);
         /* Three feathers, but only TWO meshes — one for the dark tops merged
            together and one for the pale undersides.
            
