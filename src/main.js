@@ -6,6 +6,8 @@ import { Streamer } from './world/streamer.js';
 import { ObstacleField, useModel, OBSTACLE_MATERIALS } from './world/obstacles.js';
 import { loadModel } from './world/models.js';
 import { Fireflies } from './world/fireflies.js';
+import { StarField, SPIN, screenAnchor, iconScale } from './world/stars.js';
+import { ICON } from './ui/hud.js';
 import { heightAt } from './world/terrain.js';
 import { Runner, STATE, overlaps } from './player/controller.js';
 import { feel } from './player/tuning.js';
@@ -72,6 +74,55 @@ const vistas = new Vistas(scene, streamer.scatter);
    visibility switches turn them off with the rest of that layer rather than
    needing a toggle of their own. */
 const fireflies = new Fireflies(roots);
+/* On the play layer, because a star has to be at the same depth as the player
+   to be collected by looking like it is being touched. */
+const stars = new StarField(roots[1]);
+/* The tally icon: a real collectable, parked in front of the camera.
+   Added to the SCENE rather than to a parallax root, so the LOOK panel's
+   per-layer visibility switches cannot hide the player's own counter. */
+const starIcon = stars.icon();
+starIcon.visible = false;
+scene.add(starIcon);
+const ICON_DIST = 6;      // well inside the foreground layer, so nothing occludes it
+
+/* Stars, and what they buy.
+ *
+ * The counter RESETS when it buys a life, rather than counting up forever with
+ * a life awarded at each hundred. Both give the same lives; the reset gives the
+ * player a bar that visibly empties and fills, which is the part they can read
+ * at a glance mid-run. Neither survives a run — this is an arcade game, and a
+ * stockpile carried between runs would make the first thirty seconds of every
+ * later run meaningless. */
+const STARS_PER_LIFE = 100;
+
+/* Test flags, off the URL: ?lives=3 starts a run with three in hand, ?stars=95
+   starts it five short of the next one.
+ *
+ * A URL flag rather than an edited constant, on purpose. A hardcoded 3 has to
+ * be remembered and put back, and the one time it is not, it ships — and it
+ * ships silently, because a game that is too easy looks exactly like a game
+ * that is working. This cannot be left on by accident: the default is what
+ * every player gets, and turning it on takes a deliberate act that is visible
+ * in the address bar the whole time it is on. */
+function flag(name, max) {
+  try {
+    const v = parseInt(new URLSearchParams(location.search).get(name) || '', 10);
+    return Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : 0;
+  } catch (e) { return 0; }
+}
+const START_LIVES = flag('lives', 9);
+const START_STARS = flag('stars', STARS_PER_LIFE - 1);
+if (START_LIVES || START_STARS) {
+  console.log('[ridgeline] test flags:', START_LIVES, 'lives,', START_STARS, 'stars');
+}
+
+let starCount = START_STARS;
+let lives = START_LIVES;
+/* Seconds of invulnerability bought by spending a life. Long enough to get
+   clear of the thing that hit you AND of the next one at full speed, or the
+   life is spent twice on one mistake. */
+const MERCY = 3.0;
+let mercyUntil = -1;
 const obstacles = new ObstacleField(roots[1]);
 /* Modelled obstacles, loaded in the background. Deliberately NOT awaited: the
    game is playable on its built-in shapes from the first frame, and the swap
@@ -152,6 +203,10 @@ let state = STATE.READY;
 let best = 0;
 try { best = parseFloat(localStorage.getItem('ridgeline.best') || '0') || 0; } catch (e) {}
 let deadAt = 0;
+/* One clock for the run's own timing. performance.now() is monotonic where
+   Date.now() is not — a system clock correction mid-run would otherwise hand
+   the player an hour of invulnerability, or end it instantly. */
+const now = () => performance.now() / 1000;
 
 /* The high score is shown OUTSIDE the frame, in the page around it. The HUD
    inside the 256x224 buffer stays as it is — that has to be quantised with
@@ -166,6 +221,11 @@ showBest();
 
 function restart() {
   bellsRung = 0;
+  starCount = START_STARS;
+  lives = START_LIVES;
+  mercyUntil = -1;
+  stars.reset();
+  fig.group.visible = true;
   player.reset();
   obstacles.reset();
   streamer.reset();
@@ -280,8 +340,23 @@ startLoop({
     }
     streamer.update(player.x);
     obstacles.update(player, true, dt);
+    /* After the obstacles, so an arc can be lifted clear of whatever was just
+       spawned under it rather than of last frame's idea of the layout. */
+    stars.update(player, obstacles, dt);
 
     const box = player.box;
+    const got = stars.collect(box);
+    if (got) {
+      starCount += got;
+      sfx.play('bell', 2.2);
+      while (starCount >= STARS_PER_LIFE) {
+        starCount -= STARS_PER_LIFE;
+        lives++;
+      }
+    }
+
+    // still paying for the last mistake: nothing can touch the runner
+    if (now() < mercyUntil) return;
     for (const o of obstacles.boxes()) {
       if (!overlaps(box, o)) continue;
       /* Landing ON a bird is not hitting one.
@@ -297,6 +372,16 @@ startLoop({
         player.bounce();
         sfx.play('jump', 0.8);
         continue;
+      }
+      /* A life is spent HERE, and play does not stop. No pause, no screen, no
+         reset of the obstacle field — the runner keeps running and the thing
+         that would have killed them passes through. The only feedback is the
+         flashing, which is why the flashing has to be unmistakable. */
+      if (lives > 0) {
+        lives--;
+        mercyUntil = now() + MERCY;
+        sfx.play('crash', 1.5);
+        break;
       }
       {
         state = STATE.DEAD;
@@ -356,11 +441,31 @@ startLoop({
        would come out in steps. */
     fireflies.update(cx, cy, t, dt);
 
+    /* Placed from the SNAPPED camera, not from cx/cy: the icon has to sit on
+       the same pixel grid as the HUD number beside it, or it shivers against
+       letters that do not move. */
+    starIcon.visible = state !== 'ready';
+    if (starIcon.visible) {
+      const a = screenAnchor(ICON.x, ICON.y, camera.position, halfTan, camera.aspect,
+                             view.internalW, view.internalH, ICON_DIST);
+      starIcon.position.set(a.x, a.y, a.z);
+      starIcon.scale.setScalar(iconScale(a.halfH, view.internalH, ICON.px));
+      starIcon.rotation.y = t * SPIN;
+    }
+
     /* Before the render, not after: this reads back the PREVIOUS frame, which
        the GPU finished long ago, so it never waits. Sampling it straight after
        drawing blocks on work that was just submitted — 78ms a time. */
     pipeline.sampleGlow();
-    hud.draw(state, player.distance, best, t);
+    /* Flashing, at 9Hz — fast enough to be unmistakable, slow enough that the
+       runner is actually visible for half of it. Driven off render time rather
+       than a counter so it looks the same at any frame rate, and forced back
+       on the moment mercy ends, or a run could end on an invisible runner. */
+    const mercy = now() < mercyUntil;
+    fig.group.visible = !mercy || Math.floor(t * 9) % 2 === 0;
+
+    stars.animate(t);
+    hud.draw(state, player.distance, best, t, starCount, lives);
     pipeline.render(scene, camera, hud.scene, hud.cam);
     if (veilUp) { framesDrawn++; liftVeil(); }
 

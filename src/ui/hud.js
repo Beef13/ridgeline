@@ -14,6 +14,21 @@ const TOUCH = typeof matchMedia === 'function' &&
 
 const BRIGHT = '#ffd23a';
 const DIM    = '#9a7a24';
+/* A real bright red. The HUD is composited AFTER the output stage rather than
+   multiplied by it — which is why BRIGHT above is already near the top of the
+   range — so there is no headroom to leave here and no reason to. */
+const HEART  = '#ff3a3a';
+
+/* Where the tally sits, in buffer pixels.
+ *
+ * Exported because the icon is NOT drawn here. It is a real star mesh parked in
+ * front of the camera in the main scene, so that it picks up the same lights,
+ * the same material and the same output grade as the ones the player is
+ * collecting — a canvas drawing of a star would have to imitate all three by
+ * hand and would drift the first time any of them changed. These numbers are
+ * what the two halves agree on, so the number sits beside the mesh instead of
+ * beside where the mesh used to be. */
+export const ICON = { x: 9, y: 11, px: 11 };
 
 /* The distance milestone that flashes with the bell.
  *
@@ -148,7 +163,63 @@ export class Hud {
     this.text('DUCK', x, top, DIM, 'left', size);
   }
 
-  draw(state, score, best, t) {
+  /**
+   * A heart. Two lobes and a point, drawn with beziers.
+   *
+   * Not a typed character, for the same reason as the star and the arrows: a
+   * canvas asks the system for whatever font has the glyph, and the emoji one
+   * arrives in full colour at the wrong size on some machines and as a hollow
+   * outline on others. And red here can be an honest bright red — the HUD is
+   * composited after the grade, not multiplied by it, which is why the gold
+   * next to it is #ffd23a rather than something authored dark.
+   */
+  heart(cx, cy, s, colour) {
+    const c = this.ctx;
+    c.beginPath();
+    c.moveTo(cx, cy + s * 0.85);
+    c.bezierCurveTo(cx - s * 1.45, cy - s * 0.2, cx - s * 0.62, cy - s * 1.2, cx, cy - s * 0.34);
+    c.bezierCurveTo(cx + s * 0.62, cy - s * 1.2, cx + s * 1.45, cy - s * 0.2, cx, cy + s * 0.85);
+    c.closePath();
+    c.fillStyle = colour;
+    c.fill();
+  }
+
+  /**
+   * Stars collected, and lives in hand.
+   *
+   * The icon is THE collectable, not a picture of one: same five points, same
+   * spin, same rate. A static outline next to a number would be a legend
+   * explaining what the stars are; a turning one is the thing itself, sitting
+   * in the corner, and the player never has to be told they match.
+   *
+   * Just the digit, no "/100". The denominator never changes, so after the
+   * first ten seconds it is four characters of the frame spent restating a
+   * rule the player has already learnt — and the count resets to zero when it
+   * buys a life, which says where the ceiling is without printing it.
+   *
+   * Lives are hearts, drawn one per life. A shape is read at a glance where
+   * "x2" is a glance plus a read, and this is exactly the thing a player needs
+   * to know without looking away from the ridge.
+   */
+  tally(stars, lives) {
+    /* No star drawn here — the mesh in the scene shows through. This canvas is
+       composited over the graded frame, so anything painted on this spot would
+       simply cover it. */
+    const c = this.ctx;
+    const label = String(stars);
+    const left = ICON.x + ICON.px / 2 + 3;
+    this.text(label, left, ICON.y - 6, BRIGHT, 'left', 11);
+
+    c.font = 'bold 11px "Arial Black", "Helvetica Neue", Arial, sans-serif';
+    let hx = left + c.measureText(label).width + 8;
+    for (let i = 0; i < Math.min(lives, 6); i++) {
+      this.heart(hx + 1, ICON.y + 1, 4, '#0a0d06');
+      this.heart(hx, ICON.y, 4, HEART);
+      hx += 11;
+    }
+  }
+
+  draw(state, score, best, t, stars = 0, lives = 0) {
     const c = this.ctx;
     c.clearRect(0, 0, this.w, this.h);
 
@@ -162,6 +233,7 @@ export class Hud {
        and the eye reads "100M" as five characters rather than a number with a
        unit on it. */
     this.text(String(Math.floor(score)) + 'm', this.w - 5, 5, BRIGHT, 'right', 13);
+    if (state !== 'ready') this.tally(stars, lives);
 
     /* Centred in the top third — clear of the runner and of the ridge line the
        player is reading, and clear of the score in the corner. Dropped the
