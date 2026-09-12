@@ -1,13 +1,13 @@
 {
   "title": "Strada Games",
-  "description": "A one-person game studio making small games that render like it is still 1994.",
-  "mark": "icon.png",
+  "description": "Fun is only fun when its fun...",
+  "mark": "iglogo.png",
   "markWidth": 96,
   "heading": "Strada Games",
-  "pitch": "A one-person studio making small games that render like it is still 1994.",
+  "pitch": "Fun is only fun when its fun...",
   "colours": {
-    "ground": "#060e08",
-    "panel": "#0a150e",
+    "ground": "#1324cc",
+    "panel": "#173287",
     "score": "#ffd83d",
     "faint": "#8aa899",
     "fine": "#5f7c6b",
@@ -18,49 +18,17 @@
       "type": "text",
       "heading": "What this is",
       "paragraphs": [
-        "Strada Games is one person. There is no team, no office and no roadmap — just games built slowly, on evenings, until they are worth putting up.",
-        "The interest is in constraint. Hardware from the early nineties made people solve problems a particular way, and the results still hold up in a way that a modern engine pointed at the same idea usually does not. So the constraints get rebuilt on purpose: a fixed low-resolution buffer, a small palette, everything dithered, and a tube to put it through."
+        "Just one guy trying to re-capture something he found many years ago in that 16 bit charm.."
       ]
     },
     {
       "type": "game",
       "heading": "Games",
-      "name": "Ridge Run",
+      "name": "Ridge Runner",
       "meta": "Endless runner · Browser · First release",
-      "blurb": "Run the ridge for as long as you can. Jump the obstacles, duck the birds, and collect enough stars and you get to make one more mistake than you otherwise would.",
+      "blurb": "A love Letter to DKC on the SNES. Run the ridge for as long as you can. Jump the obstacles, duck the birds, and collect enough stars and you get to make one more mistake than you otherwise would.",
       "playLabel": "Play",
       "playHref": "./"
-    },
-    {
-      "type": "spec",
-      "heading": "How it is made",
-      "intro": "Ridge Run is real 3D, rendered normally, and then put through an output stage that throws most of that away on purpose.",
-      "rows": [
-        [
-          "Internal buffer",
-          "256 × 224 pixels"
-        ],
-        [
-          "Palette",
-          "63 colours"
-        ],
-        [
-          "Colour reduction",
-          "Two-tone ordered dithering"
-        ],
-        [
-          "Output",
-          "Scanlines, shadow mask, vignette"
-        ],
-        [
-          "Built with",
-          "[three.js](https://threejs.org), no engine"
-        ],
-        [
-          "Sound",
-          "Synthesised in the browser, no samples"
-        ]
-      ]
     }
   ],
   "footer": "Strada Games · 2026 · [Ridge Run](./)"
