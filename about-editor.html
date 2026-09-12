@@ -400,14 +400,53 @@
           file
         );
 
+        /* Shrink before sending.
+         *
+         * A mark dropped in straight from a design tool is routinely several
+         * thousand pixels square and many megabytes, and it is displayed here
+         * at around 96. Everything under public/ is downloaded in full by
+         * every visitor, so the honest place to fix that is the moment of
+         * upload rather than a cleanup months later. 512 is comfortably more
+         * than four times the display size, so it stays sharp on any screen.
+         *
+         * PNG, not JPEG: these are logos on a dark ground and usually have
+         * transparency, which JPEG would fill in with black. */
+        const MAX = 512;
+        async function shrink(f) {
+          if (!/^image\//.test(f.type) || /svg/.test(f.type)) return { buf: await f.arrayBuffer(), name: f.name };
+          const url = URL.createObjectURL(f);
+          try {
+            const img = await new Promise((ok, no) => {
+              const i = new Image();
+              i.onload = () => ok(i); i.onerror = no; i.src = url;
+            });
+            if (img.width <= MAX && img.height <= MAX) return { buf: await f.arrayBuffer(), name: f.name };
+            const k = MAX / Math.max(img.width, img.height);
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+            const g = c.getContext('2d');
+            g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+            g.drawImage(img, 0, 0, c.width, c.height);
+            const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+            const name = f.name.replace(/\.[^.]+$/, '') + '.png';
+            say(`resized ${img.width}\u00d7${img.height} to ${c.width}\u00d7${c.height}`);
+            return { buf: await blob.arrayBuffer(), name };
+          } catch (e) {
+            return { buf: await f.arrayBuffer(), name: f.name };   // never block the upload
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        }
+
         async function upload(f) {
           if (!f) return;
           try {
             say('uploading ' + f.name + '…');
+            const { buf, name: outName } = await shrink(f);
             const r = await fetch('/__about/logo', {
               method: 'POST',
-              headers: { 'X-Filename': encodeURIComponent(f.name) },
-              body: await f.arrayBuffer()
+              headers: { 'X-Filename': encodeURIComponent(outName) },
+              body: buf
             });
             const d = await r.json();
             if (!r.ok) throw new Error(d.error || 'upload failed');

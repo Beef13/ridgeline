@@ -9,9 +9,9 @@
     "ground": "#1324cc",
     "panel": "#173287",
     "score": "#ffd83d",
-    "faint": "#8aa899",
-    "fine": "#5f7c6b",
-    "rule": "#1d2e24"
+    "faint": "#feffff",
+    "fine": "#84a3e8",
+    "rule": "#fed83d"
   },
   "sections": [
     {

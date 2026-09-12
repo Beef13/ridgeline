@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+#
+# Put everything live.
+#
+#     ./ship "what changed"
+#     ./ship                     (writes a dated message for you)
+#
+# Runs the tests, builds, checks nothing enormous is about to be published,
+# commits everything and pushes. GitHub rebuilds the site; it is live about a
+# minute later at https://ridge-runner.xyz
+#
+# Anything that fails stops the whole thing, so a broken build or a failing
+# test can never reach the site. Nothing is committed until every check passes.
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+GREEN=$'\033[32m'; RED=$'\033[31m'; YELL=$'\033[33m'; DIM=$'\033[2m'; OFF=$'\033[0m'
+step() { printf '\n%s==>%s %s\n' "$GREEN" "$OFF" "$1"; }
+die()  { printf '\n%sSTOPPED%s %s\n\n' "$RED" "$OFF" "$1"; exit 1; }
+
+MSG="${1:-Design and content update $(date +%Y-%m-%d)}"
+
+# --- is there anything to do? ------------------------------------------------
+if [ -z "$(git status --porcelain)" ] && \
+   [ -z "$(git log --oneline @{u}..HEAD 2>/dev/null)" ]; then
+  printf '%sNothing to ship — no changes, nothing unpushed.%s\n' "$DIM" "$OFF"
+  exit 0
+fi
+
+step "Tests"
+npm run test:logic --silent >/dev/null || die "a test failed. Run 'npm run test:logic' to see which."
+
+step "Build"
+npm run build >/dev/null 2>&1 || die "the build failed. Run 'npm run build' to see why."
+
+# --- size guard --------------------------------------------------------------
+# Everything in public/ is downloaded by every player. A 15MB logo dropped in by
+# accident is invisible until someone on a phone gives up waiting, so it is
+# caught here instead of in six months.
+step "Weight"
+BIG=$(find public -type f -size +2M 2>/dev/null || true)
+if [ -n "$BIG" ]; then
+  printf '%sThese are over 2MB and every player downloads them:%s\n' "$YELL" "$OFF"
+  echo "$BIG" | while read -r f; do printf '   %s  %s\n' "$(du -h "$f" | cut -f1)" "$f"; done
+  printf '\nShip anyway? [y/N] '
+  read -r ok < /dev/tty
+  [ "$ok" = "y" ] || [ "$ok" = "Y" ] || die "left alone. Shrink them, or move them to design-source/."
+fi
+TOTAL=$(du -sh dist 2>/dev/null | cut -f1 || echo '?')
+printf '   build is %s\n' "$TOTAL"
+
+step "Commit"
+git add -A
+if [ -n "$(git diff --cached --name-only)" ]; then
+  git commit -q -m "$MSG"
+  printf '   %s\n' "$(git log --oneline -1)"
+else
+  printf '%s   nothing new to commit — pushing what is already here%s\n' "$DIM" "$OFF"
+fi
+
+step "Push"
+git push -q origin master || die "the push failed. If it mentions credentials, sign in to GitHub in your terminal once."
+
+printf '\n%sShipped.%s GitHub is rebuilding; give it a minute, then hard-refresh:\n' "$GREEN" "$OFF"
+printf '   https://ridge-runner.xyz        %s(Cmd+Shift+R)%s\n\n' "$DIM" "$OFF"
