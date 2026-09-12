@@ -11,6 +11,11 @@ Thumbs.db
 *.png
 !public/**/*.png
 !public/*.png
+# Logo and art working files moved out of public/ so they stop being served to
+# players. They are still the source of the marks, so the *.png rule above must
+# not swallow them on the way out.
+!design-source/**/*.png
+!design-source/**/*.ai
 
 # Scratch that keeps turning up in `git status`. None of it belongs to the
 # build: "Claude outputs" is where delivered zips land, _to_delete holds files
@@ -21,3 +26,6 @@ Claude outputs/
 _to_delete/
 *.tmp
 public/audio/*.mov
+
+# The About editor writes a snapshot before each save, for its Undo button.
+about.content.bak.json

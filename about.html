@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Beef13</title>
-    <meta name="description" content="A one-person game studio making small games that render like it is still 1994." />
+    <title>__ABOUT_TITLE__</title>
+    <meta name="description" content="__ABOUT_DESCRIPTION__" />
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="256x256" href="./icon.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
@@ -15,8 +15,8 @@
          all. Absolute URLs, because relative ones are not resolved by any
          scraper. -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Beef13" />
-    <meta property="og:description" content="A one-person game studio making small games that render like it is still 1994." />
+    <meta property="og:title" content="__ABOUT_TITLE__" />
+    <meta property="og:description" content="__ABOUT_DESCRIPTION__" />
     <meta name="twitter:card" content="summary" />
 
     <style>
@@ -26,12 +26,7 @@
          concerned. Single-theme on purpose: this is a dark arcade cabinet, not
          a document that should follow the OS. */
       :root {
-        --ground: #060e08;
-        --panel:  #0a150e;
-        --score:  #ffd83d;
-        --faint:  #8aa899;
-        --fine:   #5f7c6b;
-        --rule:   #1d2e24;
+__ABOUT_TOKENS__
 
         /* Two faces, both already canon on this site: the heavy grotesque the
            score is drawn in, and the monospace of the byline. Nothing new is
@@ -69,7 +64,7 @@
 
       .mark {
         display: block;
-        width: 96px;
+        width: __ABOUT_MARK_W__px;
         height: auto;
         max-width: 100%;
         margin: 0 0 26px;
@@ -215,63 +210,7 @@
 
   <body>
     <main>
-      <img class="mark" src="./icon.png" alt="" width="96" height="96" />
-
-      <h1>Beef13</h1>
-      <p class="line">
-        A one-person studio making small games that render like it is still 1994.
-      </p>
-
-      <section>
-        <h2>What this is</h2>
-        <p>
-          Beef13 is one person. There is no team, no office and no roadmap —
-          just games built slowly, on evenings, until they are worth putting up.
-        </p>
-        <p>
-          The interest is in constraint. Hardware from the early nineties made
-          people solve problems a particular way, and the results still hold up
-          in a way that a modern engine pointed at the same idea usually does
-          not. So the constraints get rebuilt on purpose: a fixed low-resolution
-          buffer, a small palette, everything dithered, and a tube to put it
-          through.
-        </p>
-      </section>
-
-      <section>
-        <h2>Games</h2>
-        <div class="game">
-          <h3>Ridge Run</h3>
-          <p class="meta">Endless runner &middot; Browser &middot; First release</p>
-          <p>
-            Run the ridge for as long as you can. Jump the obstacles,
-            duck the birds, and collect enough stars and you get to make one
-            more mistake than you otherwise would.
-          </p>
-          <a class="play" href="./">Play</a>
-        </div>
-      </section>
-
-      <section>
-        <h2>How it is made</h2>
-        <p>
-          Ridge Run is real 3D, rendered normally, and then put through an
-          output stage that throws most of that away on purpose.
-        </p>
-        <dl class="spec">
-          <dt>Internal buffer</dt><dd>256 &times; 224 pixels</dd>
-          <dt>Palette</dt><dd>63 colours</dd>
-          <dt>Colour reduction</dt><dd>Two-tone ordered dithering</dd>
-          <dt>Output</dt><dd>Scanlines, shadow mask, vignette</dd>
-          <dt>Built with</dt><dd><a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>, no engine</dd>
-          <dt>Sound</dt><dd>Synthesised in the browser, no samples</dd>
-        </dl>
-      </section>
-
-      <footer>
-        Beef13 &middot; 2026 &middot;
-        <a href="./">Ridge Run</a>
-      </footer>
+__ABOUT_BODY__
     </main>
   </body>
 </html>

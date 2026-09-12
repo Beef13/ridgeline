@@ -1,0 +1,67 @@
+{
+  "title": "Beef13",
+  "description": "A one-person game studio making small games that render like it is still 1994.",
+  "mark": "icon.png",
+  "markWidth": 96,
+  "heading": "Strada Games",
+  "pitch": "A one-person studio making small games that render like it is still 1994.",
+  "colours": {
+    "ground": "#060e08",
+    "panel": "#0a150e",
+    "score": "#ffd83d",
+    "faint": "#8aa899",
+    "fine": "#5f7c6b",
+    "rule": "#1d2e24"
+  },
+  "sections": [
+    {
+      "type": "text",
+      "heading": "What this is",
+      "paragraphs": [
+        "Beef13 is one person. There is no team, no office and no roadmap — just games built slowly, on evenings, until they are worth putting up.",
+        "The interest is in constraint. Hardware from the early nineties made people solve problems a particular way, and the results still hold up in a way that a modern engine pointed at the same idea usually does not. So the constraints get rebuilt on purpose: a fixed low-resolution buffer, a small palette, everything dithered, and a tube to put it through."
+      ]
+    },
+    {
+      "type": "game",
+      "heading": "Games",
+      "name": "Ridge Run",
+      "meta": "Endless runner · Browser · First release",
+      "blurb": "Run the ridge for as long as you can. Jump the obstacles, duck the birds, and collect enough stars and you get to make one more mistake than you otherwise would.",
+      "playLabel": "Play",
+      "playHref": "./"
+    },
+    {
+      "type": "spec",
+      "heading": "How it is made",
+      "intro": "Ridge Run is real 3D, rendered normally, and then put through an output stage that throws most of that away on purpose.",
+      "rows": [
+        [
+          "Internal buffer",
+          "256 × 224 pixels"
+        ],
+        [
+          "Palette",
+          "63 colours"
+        ],
+        [
+          "Colour reduction",
+          "Two-tone ordered dithering"
+        ],
+        [
+          "Output",
+          "Scanlines, shadow mask, vignette"
+        ],
+        [
+          "Built with",
+          "[three.js](https://threejs.org), no engine"
+        ],
+        [
+          "Sound",
+          "Synthesised in the browser, no samples"
+        ]
+      ]
+    }
+  ],
+  "footer": "Beef13 · 2026 · [Ridge Run](./)"
+}

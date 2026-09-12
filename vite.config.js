@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { aboutContent } from './tools/about-plugin.js';
 
 const ART = resolve('public/art');
 
@@ -58,7 +59,7 @@ export default defineConfig({
      subpath like /ridgeline/ on GitHub Pages. Pinning an absolute base would
      mean one build per destination. */
   base: './',
-  plugins: [artIndex(), version()],
+  plugins: [artIndex(), version(), aboutContent()],
   server: { open: true },
   build: {
     target: 'es2022',
