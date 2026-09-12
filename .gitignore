@@ -29,3 +29,10 @@ public/audio/*.mov
 
 # The About editor writes a snapshot before each save, for its Undo button.
 about.content.bak.json
+
+# Editor working files. These keep landing in public/art because that is where
+# the exports go, and anything under public/ is published — a .psd or .ai there
+# is several MB downloaded by every player for no reason. Ignored outright so a
+# stray save cannot ship; the real ones live in design-source/logos/.
+public/**/*.psd
+public/**/*.ai
