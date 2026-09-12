@@ -60,5 +60,17 @@ export default defineConfig({
   base: './',
   plugins: [artIndex(), version()],
   server: { open: true },
-  build: { target: 'es2022' }
+  build: {
+    target: 'es2022',
+    /* A second page needs naming explicitly: Vite's default is the single
+       index.html at the root, and about.html would otherwise be absent from the
+       build entirely while working perfectly in dev — the worst kind of
+       difference, because it only shows up once it is published. */
+    rollupOptions: {
+      input: {
+        main: resolve('index.html'),
+        about: resolve('about.html')
+      }
+    }
+  }
 });

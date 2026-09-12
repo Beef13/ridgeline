@@ -6,8 +6,9 @@ import { Streamer } from './world/streamer.js';
 import { ObstacleField, useModel, OBSTACLE_MATERIALS } from './world/obstacles.js';
 import { loadModel } from './world/models.js';
 import { Fireflies } from './world/fireflies.js';
-import { StarField, SPIN, screenAnchor, iconScale } from './world/stars.js';
-import { ICON } from './ui/hud.js';
+import { StarField, SPIN, screenAnchor, iconScale, STAR_R } from './world/stars.js';
+import { ICON, LIVES, MILESTONE } from './ui/hud.js';
+import { heartGeometry, heartMaterial, heartScale, HEART_SPIN } from './world/hearts.js';
 import { heightAt } from './world/terrain.js';
 import { Runner, STATE, overlaps } from './player/controller.js';
 import { feel } from './player/tuning.js';
@@ -85,6 +86,42 @@ starIcon.visible = false;
 scene.add(starIcon);
 const ICON_DIST = 6;      // well inside the foreground layer, so nothing occludes it
 
+/* Collected stars fly to the counter rather than vanishing.
+ *
+ * The flight is what connects the two halves of the idea: without it a star
+ * disappears in one place and a number changes in another, and the player has
+ * to be told they are related. With it nobody has to be told anything.
+ *
+ * They travel in SCREEN space, not world space. A straight line through the
+ * world between something 29 units away and something 6 units away swings the
+ * star past the camera and blows it up to fill the frame on the way. Moving it
+ * across the buffer instead, and shrinking it from the size it looked to the
+ * size the icon is, is the same journey the eye actually sees. */
+const FLY_TIME = 0.42;    // seconds from being touched to arriving
+const FLY_ARC = 22;       // pixels of bow, so it sails rather than slides
+const FLY_MAX = 24;       // in flight at once, before the oldest are just banked
+const flyers = [];
+const tmpV = new THREE.Vector3();
+
+/* The lives, as meshes beside the tally. Built once and hidden, because a life
+   is common enough to want ready and rare enough not to want rebuilt: three
+   spinning hearts cost three draw calls and nothing at all while hidden. */
+const heartGeo = heartGeometry();
+const heartMat = heartMaterial();
+const heartMeshes = [];
+for (let i = 0; i < LIVES.max; i++) {
+  const m = new THREE.Mesh(heartGeo, heartMat);
+  m.visible = false;
+  scene.add(m);
+  heartMeshes.push(m);
+}
+/* Ease the tube's vignette off over the tally. The top-left corner is where the
+   vignette is deepest — 16% down at the icon's pixel — so without this the star
+   counting your stars is visibly duller than the ones you are collecting, which
+   is the one place the two must not differ. Centred on the middle of the tally
+   rather than on the icon, so the number and the hearts come up with it. */
+pipeline.vignetteRelief(20, 11, 0.17);
+
 /* Stars, and what they buy.
  *
  * The counter RESETS when it buys a life, rather than counting up forever with
@@ -110,8 +147,22 @@ function flag(name, max) {
     return Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : 0;
   } catch (e) { return 0; }
 }
-const START_LIVES = flag('lives', 9);
+const START_LIVES = flag('lives', LIVES.max);
 const START_STARS = flag('stars', STARS_PER_LIFE - 1);
+/* With any test flag on, K banks a star by hand — the only sane way to watch
+   the 99 -> new heart rollover without hunting fifty of them down first. It
+   cannot be reached without a flag in the address bar, so it is not a cheat
+   somebody can stumble into on the live site.
+   
+   K and not S: S is already the second DUCK key, so the first version of this
+   ducked the runner every time it banked a star, which is the sort of thing
+   you blame on the physics for an hour. */
+const TESTING = START_LIVES > 0 || START_STARS > 0;
+if (TESTING) {
+  addEventListener('keydown', (e) => {
+    if (e.code === 'KeyK' && state === STATE.RUNNING) { sfx.ping(); addStars(1); }
+  });
+}
 if (START_LIVES || START_STARS) {
   console.log('[ridgeline] test flags:', START_LIVES, 'lives,', START_STARS, 'stars');
 }
@@ -123,6 +174,42 @@ let lives = START_LIVES;
    life is spent twice on one mistake. */
 const MERCY = 3.0;
 let mercyUntil = -1;
+
+/**
+ * Bank stars, and spend them on lives.
+ *
+ * The counter is never allowed to be seen holding 100: the hundredth star is
+ * converted in the same step it was collected, so the HUD only ever draws 00
+ * to 99 and the rollover IS the new heart appearing. A version that let it sit
+ * on 100 for a frame would be showing a number that means nothing.
+ */
+/* When each heart was awarded, so it can be seen arriving. A life is the
+   rarest thing in the run and the easiest to miss — it appears in the corner
+   while the player is looking at the ridge — so it drops in from above the
+   frame rather than blinking into place, which is movement at the edge of
+   vision and gets noticed without demanding a glance. */
+const DROP_TIME = 0.7;      // seconds to fall into its slot
+const DROP_FROM = 46;       // pixels above its slot it starts from
+let heartBorn = [];
+
+function grantLife() {
+  heartBorn[lives] = now();
+  lives++;
+  sfx.life();
+}
+
+function addStars(n) {
+  starCount += n;
+  while (starCount >= STARS_PER_LIFE) {
+    /* Three is the ceiling. At the cap the stars stop being spent, so the
+       counter fills to 99 and sits there — which reads as "you are full"
+       without a message, and stops a long run banking lives it will never need
+       while the run that needs them has none. */
+    if (lives >= LIVES.max) { starCount = STARS_PER_LIFE - 1; return; }
+    starCount -= STARS_PER_LIFE;
+    grantLife();
+  }
+}
 const obstacles = new ObstacleField(roots[1]);
 /* Modelled obstacles, loaded in the background. Deliberately NOT awaited: the
    game is playable on its built-in shapes from the first frame, and the swap
@@ -156,6 +243,9 @@ player.onAction = (what) => sfx.play(what === 'doubleJump' ? 'jump' : what,
    fraction of a metre per step, so a proximity test either fires several
    times on the same hundred or misses one entirely at speed. */
 let bellsRung = 0;
+/* Announced once per run. Without the latch it fires on every frame past the
+   old best, which is every frame for the rest of the run. */
+let bestBeaten = false;
 // M mutes the music; it should mute the effects with it, or half the game
 // goes quiet and the player assumes the key is broken
 addEventListener('keydown', (e) => { if (e.code === 'KeyM') sfx.setMuted(music.muted); });
@@ -215,14 +305,20 @@ const now = () => performance.now() / 1000;
 const hiscoreEl = document.getElementById('hiscore');
 function showBest() {
   if (!hiscoreEl) return;
-  hiscoreEl.innerHTML = 'HIGH SCORE: ' + Math.floor(best) + '<span class="m">m</span>';
+  hiscoreEl.innerHTML = 'Best: ' + Math.floor(best) + '<span class="m">m</span>';
 }
 showBest();
 
 function restart() {
   bellsRung = 0;
+  bestBeaten = false;
   starCount = START_STARS;
   lives = START_LIVES;
+  while (flyers.length) scene.remove(flyers.pop().mesh);
+  /* Lives handed out by a test flag are already in place, not arriving — an
+     animation on them would play on every restart and tell the player
+     something happened that did not. */
+  heartBorn = new Array(LIVES.max).fill(-1e9);
   mercyUntil = -1;
   stars.reset();
   fig.group.visible = true;
@@ -272,6 +368,15 @@ function resize() {
   stage.style.height = cssH + 'px';
   renderer.domElement.style.width = cssW + 'px';
   renderer.domElement.style.height = cssH + 'px';
+
+  /* The cabinet's score is set in the same face as the one inside the screen,
+     so it is sized from the screen too rather than from the viewport: a step of
+     scale is what the game grew by, and a readout that grew by a different
+     amount stops looking like it belongs to the same machine. Held between 16
+     and 26 so a very large monitor does not turn the byline into a headline. */
+  const step = Math.max(1, Math.round(cssH / pipeline.height));
+  document.documentElement.style.setProperty(
+    '--score-size', Math.max(16, Math.min(26, Math.round(step * 8.5))) + 'px');
   camera.aspect = pipeline.width / pipeline.height;
   camera.updateProjectionMatrix();
 }
@@ -332,6 +437,13 @@ startLoop({
     if (state !== STATE.RUNNING) return;
 
     player.step(dt, inp, true);
+    /* Raised BEFORE the milestone below, so if a hundred and a personal best
+       land on the same step the best is the one left on screen — it is the
+       rarer of the two and the one the player wants. */
+    if (!bestBeaten && best > 0 && player.distance > best) {
+      bestBeaten = true;
+      hud.flash('NEW BEST', MILESTONE.bestSize);
+    }
     const hundreds = Math.floor(player.distance / 100);
     if (hundreds > bellsRung) {
       bellsRung = hundreds;
@@ -345,13 +457,21 @@ startLoop({
     stars.update(player, obstacles, dt);
 
     const box = player.box;
-    const got = stars.collect(box);
-    if (got) {
-      starCount += got;
-      sfx.play('bell', 2.2);
-      while (starCount >= STARS_PER_LIFE) {
-        starCount -= STARS_PER_LIFE;
-        lives++;
+    const taken = stars.collect(box);
+    if (taken.length) {
+      /* Sound AND count both land on the touch. The flight was worth having
+         for the line it draws between the star and the counter, but not at the
+         price of a number that lags four tenths of a second behind the thing
+         the player did — at seventeen units a second they are most of a crate
+         past it by then, and a readout that reports the past is a readout they
+         stop trusting. So the flight is now decoration over a count that has
+         already happened. */
+      sfx.ping();
+      addStars(taken.length);
+      for (const it of taken) {
+        if (flyers.length >= FLY_MAX) scene.remove(flyers.shift().mesh);
+        scene.add(it.mesh);
+        flyers.push({ mesh: it.mesh, wx: it.x, wy: it.y, born: now(), sx: -1, sy: 0, px0: 12 });
       }
     }
 
@@ -370,7 +490,7 @@ startLoop({
           box.y0 >= o.y0 + (o.y1 - o.y0) * feel.stompTop &&
           obstacles.stomp(o.id)) {
         player.bounce();
-        sfx.play('jump', 0.8);
+        sfx.stomp();
         continue;
       }
       /* A life is spent HERE, and play does not stop. No pause, no screen, no
@@ -451,6 +571,59 @@ startLoop({
       starIcon.position.set(a.x, a.y, a.z);
       starIcon.scale.setScalar(iconScale(a.halfH, view.internalH, ICON.px));
       starIcon.rotation.y = t * SPIN;
+    }
+
+    /* Stars in flight, from where they were touched to the counter.
+       Their starting point on screen is worked out on their FIRST drawn frame
+       rather than when they were collected: the camera moves between the two,
+       and a star launched from where the camera used to be starts its flight
+       with a visible jump. */
+    for (let i = flyers.length - 1; i >= 0; i--) {
+      const f = flyers[i];
+      if (f.sx < 0) {
+        tmpV.set(f.wx, f.wy, 0).project(camera);
+        f.sx = (tmpV.x * 0.5 + 0.5) * view.internalW;
+        f.sy = (0.5 - tmpV.y * 0.5) * view.internalH;
+        // how big it looks right now, so the shrink starts from its own size
+        f.px0 = (2 * STAR_R) / ((2 * halfTan * camera.position.z) / view.internalH);
+      }
+      const u = Math.min(1, Math.max(0, (now() - f.born) / FLY_TIME));
+      /* Smoothstep, and a bow. A straight line at a constant rate reads as the
+         star being dragged; easing out of the world and into the corner, over
+         a slight arc, reads as it being drawn there. */
+      const e = u * u * (3 - 2 * u);
+      const px = f.sx + (ICON.x - f.sx) * e;
+      const py = f.sy + (ICON.y - f.sy) * e - Math.sin(e * Math.PI) * FLY_ARC;
+      const a = screenAnchor(px, py, camera.position, halfTan, camera.aspect,
+                             view.internalW, view.internalH, ICON_DIST);
+      f.mesh.position.set(a.x, a.y, a.z);
+      f.mesh.scale.setScalar(iconScale(a.halfH, view.internalH, f.px0 + (ICON.px - f.px0) * e));
+      f.mesh.rotation.y = t * SPIN * 2.4;      // spun up while it travels
+      // nothing is counted here: it was banked the moment it was touched
+      if (u >= 1) { scene.remove(f.mesh); flyers.splice(i, 1); }
+    }
+
+    /* The hearts follow wherever the HUD put them, rather than being placed
+       from a second copy of the same arithmetic — the count's width changes
+       with the number of digits, and two sets of layout maths would agree
+       right up until the player passed nine stars. */
+    for (let i = 0; i < heartMeshes.length; i++) {
+      const slot = hud.heartsAt[i];
+      const m = heartMeshes[i];
+      m.visible = !!slot;
+      if (!slot) continue;
+      /* Eased out rather than linear, and from ABOVE the buffer rather than
+         from its top edge — it has to enter already moving, or the first
+         frames read as it fading in at the ceiling. */
+      const u = Math.min(1, Math.max(0, (now() - (heartBorn[i] ?? -1e9)) / DROP_TIME));
+      const fallen = 1 - Math.pow(1 - u, 3);
+      const py = slot.y - (1 - fallen) * (slot.y + DROP_FROM);
+      const a = screenAnchor(slot.x, py, camera.position, halfTan, camera.aspect,
+                             view.internalW, view.internalH, ICON_DIST);
+      m.position.set(a.x, a.y, a.z);
+      m.scale.setScalar(heartScale(a.halfH, view.internalH, LIVES.px));
+      // each one a third of a turn behind the last, so three never move as one
+      m.rotation.y = t * HEART_SPIN + i * 2.094;
     }
 
     /* Before the render, not after: this reads back the PREVIOUS frame, which

@@ -14,10 +14,6 @@ const TOUCH = typeof matchMedia === 'function' &&
 
 const BRIGHT = '#ffd23a';
 const DIM    = '#9a7a24';
-/* A real bright red. The HUD is composited AFTER the output stage rather than
-   multiplied by it — which is why BRIGHT above is already near the top of the
-   range — so there is no headroom to leave here and no reason to. */
-const HEART  = '#ff3a3a';
 
 /* Where the tally sits, in buffer pixels.
  *
@@ -28,7 +24,45 @@ const HEART  = '#ff3a3a';
  * hand and would drift the first time any of them changed. These numbers are
  * what the two halves agree on, so the number sits beside the mesh instead of
  * beside where the mesh used to be. */
-export const ICON = { x: 9, y: 11, px: 11 };
+/* `px` is the size the SHARED star geometry is scaled to, not the size the
+   star ends up on screen. The two differ because a five-pointed star does not
+   fill its own bounding box the way the heart geometry does — at 13.3 here the
+   icon renders about 12.7 x 12.0 pixels, against the heart's 12.0 x 10.7. A
+   shade larger in both directions on purpose: a shape with concave points
+   reads smaller than a solid one of the same width, so matching the numbers
+   exactly would leave the star looking like the junior of the two.
+   
+   This is the ICON only. The stars out in the world are untouched. */
+export const ICON = { x: 10, y: 11, px: 13.3 };
+
+/* The lives, beside the count. Like the star icon these are NOT drawn here —
+   they are meshes in the scene — so what the HUD owns is only where they go.
+   The gap after the number is wider than the gap between hearts on purpose:
+   the number and the hearts are two different readings, and spacing them the
+   same turns "47" and three lives into one run of five symbols. */
+export const LIVES = { max: 3, px: 12, gapAfterNumber: 11, pitch: 15 };
+
+/* Both numbers in the top row are the same size and sit on the same line. They
+   are the two things a player reads at a glance mid-run, and a tally set a
+   couple of pixels smaller than the distance reads as subordinate to it —
+   which is the wrong relationship, and at 13px against 11px it also just looks
+   like a mistake. One constant so they cannot drift apart again, and one TOP
+   so they share a baseline rather than each being nudged into place. */
+const READOUT = { size: 13, top: 5 };
+
+/**
+ * The star count as it is drawn: always two digits, 00 to 99.
+ *
+ * Padded so the field never changes width — unpadded, it is one glyph wide for
+ * the first ten stars and two after, and the hearts beside it jump sideways on
+ * the tenth, which reads as the HUD being unstable. Clamped at 99 as a
+ * backstop: the hundredth star is converted to a life in the same step it is
+ * collected, so 100 should never arrive here, and if it ever does the counter
+ * shows a number that fits rather than one that breaks the layout.
+ */
+export function starLabel(n) {
+  return String(Math.min(99, Math.max(0, Math.floor(n) || 0))).padStart(2, '0');
+}
 
 /* The distance milestone that flashes with the bell.
  *
@@ -48,6 +82,13 @@ export const ICON = { x: 9, y: 11, px: 11 };
 export const MILESTONE = {
   hold:   3.0,      // seconds it stays on screen, solid
   size:   30,
+  /* "NEW BEST" is set smaller than the distance on purpose, even though it is
+     the bigger event. The distance is a NUMBER read at a glance in peripheral
+     vision, where size is most of what carries it; this is a WORD, and a word
+     that large in the middle of the frame stops being ambient and starts
+     blocking the ridge. Nine characters at 30px is 180 pixels of a 256-pixel
+     screen. */
+  bestSize: 22,
   /* Semi-transparent, and the SHADOW fades with it. The HUD draws every glyph
      twice — a hard black offset, then the fill — so fading only the fill would
      leave a solid black number with a pale ghost sitting on it. Setting the
@@ -81,7 +122,12 @@ export class Hud {
       new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthTest: false })
     ));
     this.blink = 0;
+    /* Where the life meshes should sit this frame, in buffer pixels. Filled by
+       tally() and read by the renderer, so the layout lives in one place even
+       though it is drawn in two. */
+    this.heartsAt = [];
     this.flashText = null;
+    this.flashSize = MILESTONE.size;
     this.flashStart = -1;
   }
 
@@ -91,8 +137,9 @@ export class Hud {
    * three flashes — a milestone raised during a long frame would otherwise
    * have part of its first blink already behind it.
    */
-  flash(label) {
+  flash(label, size = MILESTONE.size) {
     this.flashText = label;
+    this.flashSize = size;
     this.flashStart = -1;
   }
 
@@ -164,27 +211,6 @@ export class Hud {
   }
 
   /**
-   * A heart. Two lobes and a point, drawn with beziers.
-   *
-   * Not a typed character, for the same reason as the star and the arrows: a
-   * canvas asks the system for whatever font has the glyph, and the emoji one
-   * arrives in full colour at the wrong size on some machines and as a hollow
-   * outline on others. And red here can be an honest bright red — the HUD is
-   * composited after the grade, not multiplied by it, which is why the gold
-   * next to it is #ffd23a rather than something authored dark.
-   */
-  heart(cx, cy, s, colour) {
-    const c = this.ctx;
-    c.beginPath();
-    c.moveTo(cx, cy + s * 0.85);
-    c.bezierCurveTo(cx - s * 1.45, cy - s * 0.2, cx - s * 0.62, cy - s * 1.2, cx, cy - s * 0.34);
-    c.bezierCurveTo(cx + s * 0.62, cy - s * 1.2, cx + s * 1.45, cy - s * 0.2, cx, cy + s * 0.85);
-    c.closePath();
-    c.fillStyle = colour;
-    c.fill();
-  }
-
-  /**
    * Stars collected, and lives in hand.
    *
    * The icon is THE collectable, not a picture of one: same five points, same
@@ -206,16 +232,26 @@ export class Hud {
        composited over the graded frame, so anything painted on this spot would
        simply cover it. */
     const c = this.ctx;
-    const label = String(stars);
-    const left = ICON.x + ICON.px / 2 + 3;
-    this.text(label, left, ICON.y - 6, BRIGHT, 'left', 11);
+    /* Always two digits, always the same width. Unpadded, the count is one
+       glyph wide for the first ten stars and two after, so the hearts beside it
+       jump sideways on the tenth — a thing the eye catches instantly and reads
+       as the HUD being unstable. Padding also makes the ceiling self-evident:
+       a counter that only ever shows 00 to 99 tells you what 100 does without
+       anywhere saying so. */
+    const label = starLabel(stars);
+    const left = ICON.x + ICON.px / 2 + 4;
+    this.text(label, left, READOUT.top, BRIGHT, 'left', READOUT.size);
 
-    c.font = 'bold 11px "Arial Black", "Helvetica Neue", Arial, sans-serif';
-    let hx = left + c.measureText(label).width + 8;
-    for (let i = 0; i < Math.min(lives, 6); i++) {
-      this.heart(hx + 1, ICON.y + 1, 4, '#0a0d06');
-      this.heart(hx, ICON.y, 4, HEART);
-      hx += 11;
+    /* Measured at the SIZE IT IS DRAWN. Measuring at one size and placing at
+       another puts the hearts through the digits the first time the count
+       reaches three figures, and only then. */
+    c.font = `bold ${READOUT.size}px "Arial Black", "Helvetica Neue", Arial, sans-serif`;
+    const x0 = left + c.measureText(label).width + LIVES.gapAfterNumber + LIVES.px / 2;
+    // centred on the digits' own middle, not on the icon's
+    const hy = READOUT.top + READOUT.size * 0.42;
+    this.heartsAt.length = 0;
+    for (let i = 0; i < Math.min(lives, LIVES.max); i++) {
+      this.heartsAt.push({ x: x0 + i * LIVES.pitch, y: hy });
     }
   }
 
@@ -232,7 +268,8 @@ export class Hud {
        Lower-case m, because at 13px a capital M is nearly as wide as a digit
        and the eye reads "100M" as five characters rather than a number with a
        unit on it. */
-    this.text(String(Math.floor(score)) + 'm', this.w - 5, 5, BRIGHT, 'right', 13);
+    this.text(String(Math.floor(score)) + 'm', this.w - 5, READOUT.top, BRIGHT, 'right', READOUT.size);
+    this.heartsAt.length = 0;
     if (state !== 'ready') this.tally(stars, lives);
 
     /* Centred in the top third — clear of the runner and of the ridge line the
@@ -244,9 +281,13 @@ export class Hud {
       const { show, done } = milestoneOn(t - this.flashStart);
       if (done) this.flashText = null;
       else if (show) {
+        const size = this.flashSize || MILESTONE.size;
         c.globalAlpha = MILESTONE.alpha;
+        /* Centred on the same LINE whatever the size, not on the same top
+           edge — two announcements that sit at different heights read as two
+           unrelated things happening in the same corner of the frame. */
         this.text(this.flashText, Math.round(this.w / 2),
-          Math.round(this.h / 6 - MILESTONE.size / 2), MILESTONE.colour, 'center', MILESTONE.size);
+          Math.round(this.h / 6 - size / 2), MILESTONE.colour, 'center', size);
         c.globalAlpha = 1;
       }
     }

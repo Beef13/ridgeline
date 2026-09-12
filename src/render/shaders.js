@@ -72,6 +72,15 @@ export const tubeFrag = /* glsl */`
   uniform sampler2D tPal;
   uniform vec2 uRes;
   uniform float uOn, uSoft, uScan, uMask, uGlow, uCurve, uVign, uGain, uRadius;
+  /* A patch of the tube where the vignette is eased off. The HUD tally lives in
+     the top-left, which is exactly where the vignette is deepest — measured at
+     16% down on a 0.25 vignette — so the star the player collects looks brighter
+     out in the world than the one counting them in the corner. Relieving it
+     there rather than lifting the icon's own colours is the only fix that
+     survives the grade: the exposure pass clamps to 1.0 before the vignette is
+     applied, so a brighter material has nothing left to give on the channels
+     that already clipped. */
+  uniform vec2 uReliefAt; uniform float uReliefR, uAspect;
 
   // A finite electron beam covers part of a pixel instead of snapping between
   // them. Widening this window is what softens the grid without blurring the
@@ -144,7 +153,19 @@ export const tubeFrag = /* glsl */`
     col *= uGain;
     if (uVign > 0.001) {
       vec2 v = uv * (1.0 - uv.yx);
-      col *= mix(1.0, pow(clamp(v.x * v.y * 16.0, 0.0, 1.0), 0.28), uVign);
+      float vg = pow(clamp(v.x * v.y * 16.0, 0.0, 1.0), 0.28);
+      /* Feathered, not a rectangle. A hard-edged exemption puts a visible seam
+         through whatever the ridge is doing behind the HUD — the corner would
+         have a bright square cut out of it. A smooth falloff over a sixth of
+         the screen reads as the tube simply being less dark there, which is
+         what an actual CRT corner looks like anyway. Circular, so uv is
+         aspect-corrected first or the patch comes out an ellipse. */
+      float relief = 0.0;
+      if (uReliefR > 0.0) {
+        vec2 d = (uv - uReliefAt) * vec2(uAspect, 1.0);
+        relief = 1.0 - smoothstep(0.0, uReliefR, length(d));
+      }
+      col *= mix(1.0, vg, uVign * (1.0 - relief));
     }
     /* Premultiplied: three's context expects it, and it is what makes the
        feathered edge composite against the page instead of against black. */

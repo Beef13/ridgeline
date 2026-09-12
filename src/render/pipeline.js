@@ -46,7 +46,12 @@ export class Pipeline {
         uRes: { value: new THREE.Vector2(width, height) },
         uOn: { value: 0 }, uSoft: { value: 0.4 }, uScan: { value: 0.22 },
         uMask: { value: 0.1 }, uGlow: { value: 0.3 }, uCurve: { value: 0 },
-        uVign: { value: 0.18 }, uGain: { value: 1.08 }, uRadius: { value: 0 }
+        uVign: { value: 0.18 }, uGain: { value: 1.08 }, uRadius: { value: 0 },
+        /* Off until something asks for it, so the tube looks the same as it
+           always did unless the HUD says otherwise. */
+        uReliefAt: { value: new THREE.Vector2(0, 0) },
+        uReliefR: { value: 0 },
+        uAspect: { value: width / height }
       },
       vertexShader: fullscreenVert,
       fragmentShader: tubeFrag,
@@ -157,6 +162,19 @@ export class Pipeline {
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(w, h, false);
     return { w, h, scale: this.scale };
+  }
+
+  /**
+   * Ease the vignette off around one spot, given in buffer pixels.
+   *
+   * @param r  radius in FRACTIONS OF THE SCREEN HEIGHT, so the patch keeps its
+   *           proportions if the buffer is ever resized.
+   */
+  vignetteRelief(px, py, r) {
+    const u = this.tubeMat.uniforms;
+    u.uReliefAt.value.set(px / this.width, py / this.height);
+    u.uReliefR.value = r;
+    u.uAspect.value = this.width / this.height;
   }
 
   /** Push the (possibly graded) palette to the shader. */

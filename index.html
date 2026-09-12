@@ -31,7 +31,12 @@
       :root {
         --ground: #060e08;      /* the cabinet the screen sits in */
         --score:  #ffd83d;
-        --faint:  #2f4436;
+        /* The byline. Was #2f4436, which on a bright cabinet read as a smudge
+           rather than text — legible enough to notice, not enough to read. Lifted
+           to the same family but well clear of the ground, still cool and green so
+           it never competes with the yellow score above it. */
+        --faint:  #8aa899;
+        --fine:   #5f7c6b;    /* the small print under it — a step quieter again */
         --dim:    #55705f;    /* muted: still legible, clearly switched off */
       }
       * { box-sizing: border-box; }
@@ -131,10 +136,16 @@
       #hiscore {
         margin: auto 0 0;          /* takes the slack, pinning itself low */
         flex: 0 0 auto;
-        font-size: clamp(13px, 2.1vh, 22px);
-        letter-spacing: 0.06em;
-        font-weight: 600;
-        text-transform: uppercase;
+        /* The SAME face the score inside the screen is drawn in, down to the
+           fallback order — the HUD asks a canvas for exactly this stack, so
+           anything else here is a second typeface pretending to belong to the
+           same machine. No letter-spacing and no uppercasing for the same
+           reason: the HUD applies neither, so the lowercase m matches the one
+           on the live distance instead of becoming an M. */
+        font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+        font-size: var(--score-size, 16px);
+        letter-spacing: 0;
+        font-weight: 700;
         color: var(--score);
       }
       #hiscore .m { font-size: 0.78em; }
@@ -162,14 +173,51 @@
       #m-music.off { color: var(--dim); }
 
       footer {
-        margin: 6px 0 0;
+        /* The byline is a different KIND of thing from the score — one belongs
+           to the run, the other to the build — and six pixels read as them
+           being one block with a line break in it. Scaled rather than fixed,
+           so the separation survives a tall window as well as a short one. */
+        margin: clamp(16px, 2.6vh, 34px) 0 0;
         flex: 0 0 auto;
         font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
         font-size: 11px;
         letter-spacing: 0.32em;
         color: var(--faint);
         white-space: nowrap;      /* one line, or the tracking makes it two */
+        /* The byline is one nowrap line, so the footer box has always been
+           exactly as wide as that line. The small print underneath is longer
+           and wraps, so without this it would set the box's width and leave the
+           byline hanging off to one side. Centred text keeps both lines on the
+           same axis whatever either of them measures. */
+        text-align: center;
       }
+
+      /* The small print: credits, source, and where the score lives. A separate
+         KIND of line again — the byline names the build, this names the things
+         the build stands on — so it is quieter, tracked far less tightly, and
+         allowed to wrap. Anything that wraps cannot also be nowrap, and at this
+         tracking it does not need to be. */
+      footer .fine {
+        display: block;
+        margin-top: 7px;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: var(--fine);
+        white-space: normal;
+        max-width: 34em;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.6;
+      }
+      footer a {
+        color: inherit;
+        text-decoration: underline;
+        /* Held off the baseline so the underline does not collide with the
+           descenders in the monospace face. */
+        text-underline-offset: 2px;
+        text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+      }
+      footer a:hover, footer a:focus-visible { color: var(--faint); }
       /* The byline gained a version and an edition name, and at 0.32em of
          tracking that is 325px of text — wider than a small phone. Tighten
          the tracking rather than let it wrap or clip. */
@@ -267,7 +315,7 @@
     <div class="cabinet">
       <img id="logo" src="./logo.png" alt="Ridge Run" />
       <div id="stage"></div>
-      <p id="hiscore">HIGH SCORE: 0000<span class="m">m</span></p>
+      <p id="hiscore">Best: 0000<span class="m">m</span></p>
       <!-- Inline rather than image files: two colours and a swapped glyph is
            less code than two PNGs, it recolours with `currentColor`, and it
            cannot be the one asset that fails to load. -->
@@ -285,7 +333,14 @@
         </svg>
       </button>
 
-      <footer>Beef13 &middot; 2026 &middot; v__VERSION__ &middot; Granite</footer>
+      <footer>
+        <a href="./about.html">Beef13</a> &middot; 2026 &middot; v__VERSION__ &middot; Beta
+        <span class="fine">
+          <a href="./about.html">About</a>
+          &middot; Built with <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
+          &middot; Your best score is saved in this browser and nowhere else
+        </span>
+      </footer>
     </div>
     <script>
       /* The last word on the iOS magnifier.

@@ -11,3 +11,13 @@ Thumbs.db
 *.png
 !public/**/*.png
 !public/*.png
+
+# Scratch that keeps turning up in `git status`. None of it belongs to the
+# build: "Claude outputs" is where delivered zips land, _to_delete holds files
+# waiting to be removed by hand, and the .tmp files are half-written art
+# exports. test.mov is a reference recording, not a game asset — anything left
+# in public/audio is published and shipped to every player.
+Claude outputs/
+_to_delete/
+*.tmp
+public/audio/*.mov
