@@ -5,6 +5,7 @@ import { frondTexture, bladeTexture, treeTexture } from './art.js';
 import { LAYERS } from './scene.js';
 import { design } from '../design.js';
 import { ScatterArt } from './scatterart.js';
+import { rndDecor } from '../core/rng.js';
 
 /**
  * Keeps a rolling window of ground and scenery around the player. Chunks are
@@ -13,7 +14,9 @@ import { ScatterArt } from './scatterart.js';
  */
 const CHUNK = 16;
 const AHEAD = 5, BEHIND = 2;
-const rnd = () => Math.random();
+/* Scenery only — bushes, ferns, their sizes and lean. On the decor stream so
+   that changing or skipping any of it cannot shift where an obstacle lands. */
+const rnd = rndDecor;
 
 let ART = null;
 function art() {

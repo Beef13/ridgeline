@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SRGB } from '../core/colour.js';
 import { heightAt } from './terrain.js';
 import { feel } from '../player/tuning.js';
+import { rndWorld } from '../core/rng.js';
 
 /**
  * Collectable stars.
@@ -195,7 +196,7 @@ const SHAPES = [
   { kind: 'awkward',   weight: 0.20 }
 ];
 
-export function pickShape(r = Math.random()) {
+export function pickShape(r = rndWorld()) {
   let acc = 0;
   for (const s of SHAPES) { acc += s.weight; if (r < acc) return s.kind; }
   return 'reachable';
@@ -238,7 +239,7 @@ const APPROACH = 6;
  * @param ground  x -> terrain height. Passed in rather than imported so the
  *                tests can drive it with slopes the real ridge rarely makes.
  */
-export function planArc(kind, x0, n, clearTop, ground, r = Math.random()) {
+export function planArc(kind, x0, n, clearTop, ground, r = rndWorld()) {
   /* eslint-disable-next-line no-param-reassign */
   const R = reach();
   const gap = ARC.gap, span = (n - 1) * gap;
@@ -375,7 +376,7 @@ export class StarField {
     if (this.nextX < player.x) this.nextX = player.x + 12;
 
     for (;;) {
-      const n = ARC.min + Math.floor(Math.random() * (ARC.max - ARC.min + 1));
+      const n = ARC.min + Math.floor(rndWorld() * (ARC.max - ARC.min + 1));
       const span = (n - 1) * ARC.gap;
       const x0 = this.nextX;
       /* The WHOLE arc has to be behind the frontier, not just its first star.
@@ -409,7 +410,7 @@ export class StarField {
            pixel star — which shook the line apart into a zig-zag. Sharing the
            phase makes the arc rise and fall as one object, so it can breathe
            without stopping being a curve. */
-        const bob = Math.random() * 6.28;
+        const bob = rndWorld() * 6.28;
         for (let i = 0; i < n; i++) {
           const x = x0 + i * ARC.gap;
           const mesh = new THREE.Mesh(this.geo, this.mat);
@@ -422,7 +423,7 @@ export class StarField {
         }
       }
       // a long gap between arcs: they are a treat, not a carpet
-      this.nextX = x0 + span + 14 + Math.random() * 18;
+      this.nextX = x0 + span + 14 + rndWorld() * 18;
     }
 
     for (let i = this.items.length - 1; i >= 0; i--) {

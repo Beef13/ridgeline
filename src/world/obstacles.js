@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { SRGB } from '../core/colour.js';
 import { heightAt } from './terrain.js';
 import { feel } from '../player/tuning.js';
+import { rndWorld } from '../core/rng.js';
 
 /**
  * Four things to dodge, each demanding a different answer:
@@ -145,7 +146,10 @@ export const WING_FEATHERS = [
   [0.19, 0.078, 0.13, -0.14, 0.010, 0.51]
 ];
 
-const rnd = () => Math.random();
+/* The world stream. Everything here decides where the player can go, and the
+   cosmetic details (a post's lean, a crate's spin) are drawn in lockstep with
+   the obstacle that owns them, so they belong to the same sequence. */
+const rnd = rndWorld;
 
 /* Filled in by `useModel` once a .glb has loaded. Empty is the normal state
    for the first second of a session, and a permanent one if the file is
@@ -603,12 +607,12 @@ export class ObstacleField {
     const t = Math.min(1, distance / f.difficultyAt);
     const reaction = f.reactionTime * (1.0 - 0.35 * t);
     const base = speed * reaction;
-    const slack = (2.4 - 1.6 * t) * (0.6 + Math.random() * 0.9);
+    const slack = (2.4 - 1.6 * t) * (0.6 + rnd() * 0.9);
     return base + slack;
   }
 
   pickKind() {
-    let k = TABLE[Math.floor(Math.random() * TABLE.length)];
+    let k = TABLE[Math.floor(rnd() * TABLE.length)];
     // Never two ducks back to back — the player would still be standing up.
     if (k === this.lastKind && (k === 'sign' || k === 'fence')) {
       k = 'crate';
@@ -629,7 +633,7 @@ export class ObstacleField {
         g.position.set(this.nextX, gy, 0);
         this.root.add(g);
         const it = { name, kind, box: b, group: g, x: this.nextX, gy,
-                     phase: Math.random() * 6.28, yOff: b.yOff, id: this.nextId++,
+                     phase: rnd() * 6.28, yOff: b.yOff, id: this.nextId++,
                      stomped: -1 };
         this.items.push(it);
         this.nextX += this.gapFor(player.speed, player.distance) + b.w;

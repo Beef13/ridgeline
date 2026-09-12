@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SRGB } from '../core/colour.js';
 import { LAYERS } from './scene.js';
+import { rndDecor } from '../core/rng.js';
 
 /**
  * Fireflies.
@@ -85,16 +86,16 @@ export class Fireflies {
       const motes = [];
       for (let i = 0; i < cfg.count; i++) {
         motes.push({
-          x: (Math.random() - 0.5) * cfg.span,
-          y: (Math.random() - 0.5) * cfg.rise,
-          z: z0 + (Math.random() - 0.5) * 2.2,
-          phase: Math.random() * 6.28,
+          x: (rndDecor() - 0.5) * cfg.span,
+          y: (rndDecor() - 0.5) * cfg.rise,
+          z: z0 + (rndDecor() - 0.5) * 2.2,
+          phase: rndDecor() * 6.28,
           /* Each mote gets its own rate as well as its own phase. Shared rates
              drift into step with each other and the swarm starts blinking in
              unison, which looks authored rather than alive. */
-          rate: cfg.rate * (0.7 + Math.random() * 0.6),
-          bobP: Math.random() * 6.28,
-          bobR: 0.5 + Math.random() * 0.7
+          rate: cfg.rate * (0.7 + rndDecor() * 0.6),
+          bobP: rndDecor() * 6.28,
+          bobR: 0.5 + rndDecor() * 0.7
         });
       }
 

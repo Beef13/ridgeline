@@ -23,6 +23,7 @@ import { pushLook } from './ui/look.js';
 import { design, FEEL_KEYS_THAT_TRANSFER } from './design.js';
 import { snapshotPalette } from './render/grade.js';
 import { cue } from './world/streamer.js';
+import { seedRun, randomSeed, currentSeed } from './core/rng.js';
 
 const VIEW_H = 7.2;                       // world units visible vertically
 const view = { fov: 14, internalW: 256, internalH: 224 };
@@ -154,6 +155,12 @@ const START_STARS = flag('stars', STARS_PER_LIFE - 1);
    which gets harder every time you succeed — the one piece of feedback in the
    game that is hardest to test precisely when you most want to look at it. */
 const START_BEST = flag('best', 99999);
+/* ?seed=N replays one exact world. Every run otherwise picks its own, which is
+   what makes a bug report answerable: the seed is printed on the console, so
+   "a bird was unjumpable somewhere near 400m" becomes a level anyone can
+   rebuild. Not folded into TESTING — replaying a world is not a cheat, and the
+   K key should not come with it. */
+const FIXED_SEED = flag('seed', 0xffffffff);
 /* With any test flag on, K banks a star by hand — the only sane way to watch
    the 99 -> new heart rollover without hunting fifty of them down first. It
    cannot be reached without a flag in the address bar, so it is not a cheat
@@ -319,6 +326,11 @@ function showBest() {
 showBest();
 
 function restart() {
+  /* First, and before any reset below: obstacles, stars and the streamer all
+     generate from the stream, so seeding after them would build the opening of
+     the level from the previous run and make the seed a lie. */
+  seedRun(FIXED_SEED || randomSeed());
+  console.log('[ridgeline] seed', currentSeed());
   bellsRung = 0;
   bestBeaten = false;
   starCount = START_STARS;
