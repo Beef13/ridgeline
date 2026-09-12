@@ -149,6 +149,11 @@ function flag(name, max) {
 }
 const START_LIVES = flag('lives', LIVES.max);
 const START_STARS = flag('stars', STARS_PER_LIFE - 1);
+/* A pretend personal best, so NEW BEST can be seen on demand. Without it the
+   only way to watch that announcement is to actually beat your own record,
+   which gets harder every time you succeed — the one piece of feedback in the
+   game that is hardest to test precisely when you most want to look at it. */
+const START_BEST = flag('best', 99999);
 /* With any test flag on, K banks a star by hand — the only sane way to watch
    the 99 -> new heart rollover without hunting fifty of them down first. It
    cannot be reached without a flag in the address bar, so it is not a cheat
@@ -157,14 +162,14 @@ const START_STARS = flag('stars', STARS_PER_LIFE - 1);
    K and not S: S is already the second DUCK key, so the first version of this
    ducked the runner every time it banked a star, which is the sort of thing
    you blame on the physics for an hour. */
-const TESTING = START_LIVES > 0 || START_STARS > 0;
+const TESTING = START_LIVES > 0 || START_STARS > 0 || START_BEST > 0;
 if (TESTING) {
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyK' && state === STATE.RUNNING) { sfx.ping(); addStars(1); }
   });
 }
-if (START_LIVES || START_STARS) {
-  console.log('[ridgeline] test flags:', START_LIVES, 'lives,', START_STARS, 'stars');
+if (TESTING) {
+  console.log('[ridgeline] test flags:', START_LIVES, 'lives,', START_STARS, 'stars, best', START_BEST);
 }
 
 let starCount = START_STARS;
@@ -292,6 +297,10 @@ addEventListener('keydown', unlock, true);
 let state = STATE.READY;
 let best = 0;
 try { best = parseFloat(localStorage.getItem('ridgeline.best') || '0') || 0; } catch (e) {}
+/* The flag wins over the stored value, and the save on death is skipped while
+   it is set (see STATE.DEAD below) — so testing the announcement cannot
+   overwrite a real record. */
+if (START_BEST > 0) best = START_BEST;
 let deadAt = 0;
 /* One clock for the run's own timing. performance.now() is monotonic where
    Date.now() is not — a system clock correction mid-run would otherwise hand
@@ -443,6 +452,7 @@ startLoop({
     if (!bestBeaten && best > 0 && player.distance > best) {
       bestBeaten = true;
       hud.flash('NEW BEST', MILESTONE.bestSize);
+      sfx.newBest();
     }
     const hundreds = Math.floor(player.distance / 100);
     if (hundreds > bellsRung) {
@@ -510,7 +520,13 @@ startLoop({
         music.setDuck(true);          // pull the music back so the run-over screen lands
         if (player.distance > best) {
           best = player.distance;
-          try { localStorage.setItem('ridgeline.best', String(best)); } catch (e) {}
+          /* Not while a fake best is in the address bar. Testing the
+             announcement with ?best=50 and then dying at 60 would otherwise
+             write 60 over a real record of any size — the test destroying the
+             very thing it borrowed. */
+          if (!START_BEST) {
+            try { localStorage.setItem('ridgeline.best', String(best)); } catch (e) {}
+          }
           showBest();
         }
         break;

@@ -279,6 +279,71 @@ export class Sfx {
     if (this.bus) this.bus.gain.value = on ? 0 : this.volume;
   }
 
+  /**
+   * NEW BEST. A rising B-flat major-sixth arpeggio, then the top three notes
+   * shimmering away — the shape of the reference clip, rebuilt rather than
+   * sampled so it costs nothing to download.
+   */
+  newBest() {
+    const ctx = this.ctx;
+    if (!ctx || this.muted) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const at = ctx.currentTime;
+
+    const shape = ctx.createWaveShaper();
+    const curve = new Float32Array(1024), k = 4, drive = 0.1;
+    for (let i = 0; i < 1024; i++) {
+      const x = (i / 1023) * 2 - 1;
+      curve[i] = x * (1 - drive) + (Math.tanh(x * k) / Math.tanh(k)) * drive;
+    }
+    shape.curve = curve;
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 9100; lp.Q.value = 0.6;
+    const out = ctx.createGain(); out.gain.value = 0.34;
+    shape.connect(lp); lp.connect(out); out.connect(this.bus);
+
+    /* Near-pure tones: the reference has its third harmonic at 0.01 of the
+       fundamental and nothing above it at all. */
+    const HARM = [1, 0, 0.012];
+    const SUM = HARM.reduce((a, b) => a + b, 0);
+    const ROOT = 514.4;             // 25 cents flat, as recorded
+    const LEAD = [0, 4, 7, 9, 12];          // semitones above the root
+    const TAIL = [7, 9, 12];
+    const STEP = 0.071, TAIL_STEP = 0.08;
+    const NOTE_TAU = 0.32, TAIL_TAU = 0.5;
+    const TAIL_LEVEL = 0.38, TAIL_COUNT = 14;
+    const ATTACK = 0.0006;
+
+    const note = (f, t0, lvl, tau) => {
+      for (let h = 0; h < HARM.length; h++) {
+        if (HARM[h] <= 0.002) continue;
+        const o = ctx.createOscillator();
+        o.type = 'sine'; o.frequency.value = f * (h + 1);
+        const g = ctx.createGain();
+        const peak = Math.max(0.0001, (lvl / SUM) * HARM[h]);
+        const dur = Math.max(0.03, tau * 3.2);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(peak, t0 + ATTACK);
+        // exponential, or the fade lands with an audible corner
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        o.connect(g); g.connect(shape);
+        o.start(t0); o.stop(t0 + dur + 0.01);
+      }
+    };
+
+    LEAD.forEach((s, i) => note(ROOT * Math.pow(2, s / 12), at + i * STEP, 1, NOTE_TAU));
+
+    // One decay across the whole tail, not one per note: the shimmer has to
+    // fall away as a single gesture or it reads as a stutter.
+    const t0 = at + LEAD.length * STEP;
+    for (let i = 0; i < TAIL_COUNT; i++) {
+      const s = TAIL[i % TAIL.length];
+      const lvl = TAIL_LEVEL * Math.exp(-(i * TAIL_STEP) / TAIL_TAU);
+      note(ROOT * Math.pow(2, s / 12), t0 + i * TAIL_STEP, lvl, NOTE_TAU * 0.7);
+    }
+  }
+
   setVolume(v) {
     this.volume = v;
     if (this.bus && !this.muted) this.bus.gain.value = v;
